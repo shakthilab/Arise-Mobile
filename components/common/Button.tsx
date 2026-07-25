@@ -1,10 +1,9 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle, TextStyle } from 'react-native';
 
 import { colors } from '@/theme/colors';
-import { radius, spacing } from '@/theme/spacing';
-import { typography } from '@/theme/typography';
+import { fontFamilies } from '@/theme/typography';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
 
 type ButtonProps = {
   label: string;
@@ -12,9 +11,21 @@ type ButtonProps = {
   variant?: ButtonVariant;
   disabled?: boolean;
   loading?: boolean;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
+  icon?: React.ReactNode;
 };
 
-export function Button({ label, onPress, variant = 'primary', disabled, loading }: ButtonProps) {
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  disabled,
+  loading,
+  style,
+  labelStyle,
+  icon,
+}: ButtonProps) {
   const isDisabled = disabled || loading;
 
   return (
@@ -24,14 +35,26 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
       style={({ pressed }) => [
         styles.base,
         variantStyles[variant],
+        style,
         isDisabled && styles.disabled,
         pressed && !isDisabled && styles.pressed,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'ghost' ? colors.accentPrimary : colors.textPrimary} />
+        <ActivityIndicator color={variant === 'primary' ? '#000000' : colors.textPrimary} />
       ) : (
-        <Text style={[styles.label, variant === 'ghost' && styles.ghostLabel]}>{label}</Text>
+        <View style={styles.contentRow}>
+          {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
+          <Text
+            style={[
+              styles.label,
+              variantTextStyles[variant],
+              labelStyle,
+            ]}
+          >
+            {label}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
@@ -39,11 +62,19 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
+    height: 52,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconContainer: {
+    marginRight: 10,
   },
   disabled: {
     opacity: 0.5,
@@ -52,24 +83,46 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   label: {
-    ...typography.subtitle,
-    color: colors.textPrimary,
-  },
-  ghostLabel: {
-    color: colors.accentPrimary,
+    fontFamily: fontFamilies.bold,
+    fontSize: 14,
+    letterSpacing: 1.5,
   },
 });
 
 const variantStyles = StyleSheet.create({
   primary: {
-    backgroundColor: colors.accentPrimary,
+    backgroundColor: '#FFFFFF',
   },
   secondary: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  outline: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: '#26262A',
+  },
   ghost: {
     backgroundColor: 'transparent',
   },
 });
+
+
+const variantTextStyles = StyleSheet.create({
+  primary: {
+    color: '#000000',
+  },
+  secondary: {
+    color: colors.textPrimary,
+  },
+  outline: {
+    color: colors.textPrimary,
+    fontFamily: fontFamilies.medium,
+    letterSpacing: 0,
+  },
+  ghost: {
+    color: colors.textPrimary,
+  },
+});
+

@@ -1,35 +1,38 @@
 export const palette = {
-  black: '#05070C',
-  navy900: '#0A0E17',
-  navy800: '#131826',
-  navy700: '#1C2333',
-  navy600: '#2A3347',
-  navy500: '#3A4560',
+  black: '#000000',
+  navy900: '#050505',
+  navy800: '#0E0E10',
+  navy700: '#161618',
+  navy600: '#27272A',
+  navy500: '#3F3F46',
 
   white: '#FFFFFF',
-  slate100: '#E6E9F2',
-  slate300: '#8A93A8',
-  slate500: '#5A627A',
+  slate100: '#F4F4F6',
+  slate300: '#A1A1AA',
+  slate500: '#71717A',
 
   blue: '#5B8CFF',
   purple: '#9D4EDD',
-  gold: '#FFC94D',
+  gold: '#E5A93C',
+  goldMuted: '#C5A059',
   red: '#FF4D6D',
   green: '#3DDC97',
 } as const;
 
 export const colors = {
-  background: palette.navy900,
+  background: palette.black,
   surface: palette.navy800,
   surfaceElevated: palette.navy700,
   border: palette.navy600,
 
-  textPrimary: palette.slate100,
+  textPrimary: palette.white,
   textSecondary: palette.slate300,
   textMuted: palette.slate500,
 
-  accentPrimary: palette.blue,
+  accentPrimary: palette.white,
   accentSecondary: palette.purple,
+  accentGold: palette.gold,
+  accentGoldMuted: palette.goldMuted,
 
   success: palette.green,
   danger: palette.red,
@@ -45,3 +48,4 @@ export const colors = {
 } as const;
 
 export type AppColors = typeof colors;
+
