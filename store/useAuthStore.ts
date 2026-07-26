@@ -6,15 +6,18 @@ import type { User } from '@/types/user';
 type AuthState = {
   user: User | null;
   isAuthenticating: boolean;
+  isOnboarded: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
+  completeOnboarding: () => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticating: false,
+  isOnboarded: true,
 
   login: async (email, password) => {
     set({ isAuthenticating: true });
@@ -30,7 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isAuthenticating: true });
     try {
       const user = await authService.signup(email, password, displayName);
-      set({ user });
+      set({ user, isOnboarded: false });
     } finally {
       set({ isAuthenticating: false });
     }
@@ -42,4 +45,5 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   setUser: (user) => set({ user }),
+  completeOnboarding: () => set({ isOnboarded: true }),
 }));

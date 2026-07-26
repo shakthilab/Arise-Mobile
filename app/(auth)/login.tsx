@@ -44,25 +44,25 @@ export default function LoginScreen() {
         toValue: 1,
         duration: 850,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
+        useNativeDriver: true,
       }),
       Animated.timing(formAnim, {
         toValue: 1,
         duration: 850,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
+        useNativeDriver: true,
       }),
       Animated.timing(buttonAnim, {
         toValue: 1,
         duration: 850,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
+        useNativeDriver: true,
       }),
       Animated.timing(socialAnim, {
         toValue: 1,
         duration: 850,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
+        useNativeDriver: true,
       }),
     ]).start();
   }, [heroAnim, formAnim, buttonAnim, socialAnim]);
@@ -256,7 +256,7 @@ export default function LoginScreen() {
               {/* Bottom Link */}
               <View style={styles.signupContainer}>
                 <Text style={styles.signupPrefix}>New here? </Text>
-                <Link href="/(auth)/signup" asChild>
+                <Link href="/(onboarding)/name" asChild>
                   <Pressable>
                     <Text style={styles.signupLink}>Create account</Text>
                   </Pressable>

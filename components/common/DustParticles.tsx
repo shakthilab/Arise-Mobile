@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 type DustParticlesProps = {
@@ -15,7 +15,7 @@ type ParticleData = {
   initialProgress: number;
 };
 
-export function DustParticles({ count = 30 }: DustParticlesProps) {
+function DustParticlesComponent({ count = 20 }: DustParticlesProps) {
   // Generate random configuration for continuous floating dust particles
   const particlesConfig = useRef<ParticleData[]>(
     Array.from({ length: count }, () => ({
@@ -45,7 +45,7 @@ export function DustParticles({ count = 30 }: DustParticlesProps) {
         toValue: 1,
         duration: initialDuration,
         easing: Easing.linear,
-        useNativeDriver: false,
+        useNativeDriver: true,
       });
 
       const loopCycle = Animated.loop(
@@ -53,13 +53,13 @@ export function DustParticles({ count = 30 }: DustParticlesProps) {
           Animated.timing(anim, {
             toValue: 0,
             duration: 0,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(anim, {
             toValue: 1,
             duration: config.duration,
             easing: Easing.linear,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ])
       );
@@ -116,6 +116,8 @@ export function DustParticles({ count = 30 }: DustParticlesProps) {
   );
 }
 
+export const DustParticles = React.memo(DustParticlesComponent);
+
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFill,
@@ -130,3 +132,4 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 });
+

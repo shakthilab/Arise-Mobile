@@ -55,7 +55,7 @@ export default function SignupScreen() {
     setError(null);
     try {
       await signup(email, password, displayName);
-      router.replace('/(onboarding)');
+      router.replace('/(onboarding)/name');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     }
