@@ -3,11 +3,14 @@ import { router } from 'expo-router';
 import {
   Animated,
   Easing,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,18 +20,31 @@ import { Screen } from '@/components/common/Screen';
 import { StepIndicator } from '@/components/common/StepIndicator';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
-import { soundManager } from '@/utils/soundManager';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 1; // second step (0-indexed)
 
-const MIN_AGE = 14;
+const MIN_AGE = 8;
 const MAX_AGE = 80;
 const AGE_TICK_SPACING = 24;
+
+const AGE_PRESETS = [8, 14, 18, 24, 30, 45, 60];
+
+const getMetabolicClassification = (currentAge: number) => {
+  if (currentAge < 18) return { label: 'NEURAL GROWTH BASELINE', code: 'VEC-01' };
+  if (currentAge < 30) return { label: 'PRIME VECTOR (OPTIMAL RECOVERY)', code: 'VEC-02' };
+  if (currentAge < 46) return { label: 'VETERAN ADAPTATION', code: 'VEC-03' };
+  return { label: 'APEX MASTERY PARAMETERS', code: 'VEC-04' };
+};
 
 export default function BiometricsScreen() {
   const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [age, setAge] = useState(24);
+
+  // Edit Age Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [inputAge, setInputAge] = useState('24');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const ageScrollRef = useRef<ScrollView>(null);
 
@@ -106,6 +122,55 @@ export default function BiometricsScreen() {
     }
   };
 
+  const handleSelectAge = (newAge: number) => {
+    const clamped = Math.max(MIN_AGE, Math.min(MAX_AGE, newAge));
+    setAge(clamped);
+    setTimeout(() => {
+      const targetX = (clamped - MIN_AGE) * AGE_TICK_SPACING;
+      ageScrollRef.current?.scrollTo({ x: targetX, animated: true });
+    }, 50);
+  };
+
+  const handleOpenEditModal = () => {
+    setInputAge(age.toString());
+    setErrorMsg('');
+    setIsModalOpen(true);
+  };
+
+  const handleSaveAge = () => {
+    const parsed = parseInt(inputAge, 10);
+    if (isNaN(parsed) || parsed < MIN_AGE || parsed > MAX_AGE) {
+      setErrorMsg(`Age must be between ${MIN_AGE} and ${MAX_AGE} YRS.`);
+      return;
+    }
+    setAge(parsed);
+    setIsModalOpen(false);
+
+    // Scroll ruler scale smoothly to new age position after modal closes
+    setTimeout(() => {
+      const targetX = (parsed - MIN_AGE) * AGE_TICK_SPACING;
+      ageScrollRef.current?.scrollTo({ x: targetX, animated: true });
+    }, 150);
+  };
+
+  const handleIncrement = () => {
+    const parsed = parseInt(inputAge, 10) || age;
+    if (parsed < MAX_AGE) {
+      const next = parsed + 1;
+      setInputAge(next.toString());
+      if (next >= MIN_AGE && next <= MAX_AGE) setErrorMsg('');
+    }
+  };
+
+  const handleDecrement = () => {
+    const parsed = parseInt(inputAge, 10) || age;
+    if (parsed > MIN_AGE) {
+      const prev = parsed - 1;
+      setInputAge(prev.toString());
+      if (prev >= MIN_AGE && prev <= MAX_AGE) setErrorMsg('');
+    }
+  };
+
   return (
     <Screen style={styles.screen}>
       {/* ─── Top Bar ─── */}
@@ -137,10 +202,7 @@ export default function BiometricsScreen() {
           <View style={styles.genderRow}>
             {/* Male Card */}
             <Pressable
-              onPress={() => {
-                soundManager.play('select');
-                setGender('male');
-              }}
+              onPress={() => setGender('male')}
               style={[
                 styles.genderCard,
                 gender === 'male' && styles.genderCardSelected,
@@ -160,10 +222,7 @@ export default function BiometricsScreen() {
 
             {/* Female Card */}
             <Pressable
-              onPress={() => {
-                soundManager.play('select');
-                setGender('female');
-              }}
+              onPress={() => setGender('female')}
               style={[
                 styles.genderCard,
                 gender === 'female' && styles.genderCardSelected,
@@ -183,10 +242,7 @@ export default function BiometricsScreen() {
 
             {/* Other Card */}
             <Pressable
-              onPress={() => {
-                soundManager.play('select');
-                setGender('other');
-              }}
+              onPress={() => setGender('other')}
               style={[
                 styles.genderCard,
                 gender === 'other' && styles.genderCardSelected,
@@ -208,75 +264,142 @@ export default function BiometricsScreen() {
 
         {/* ─── Section 2: TEMPORAL AGE ─── */}
         <Animated.View style={[styles.sectionContainer, fadeSlideStyle(ageAnim)]}>
-          <View style={styles.headerRow}>
-            <View style={styles.iconBox}>
-              <MaterialCommunityIcons name="clock-outline" size={20} color="#FFFFFF" />
+          {/* Section Title Row */}
+          <View style={styles.ageTitleRow}>
+            <View style={styles.ageTitleLeft}>
+              <View style={styles.ageTitleIcon}>
+                <MaterialCommunityIcons name="clock-fast" size={18} color={colors.accentGold} />
+              </View>
+              <Text style={styles.ageTitleText}>TEMPORAL AGE</Text>
             </View>
-            <Text style={styles.sectionLabel}>TEMPORAL AGE</Text>
-            <View style={styles.valueWrapper}>
-              <Text style={styles.goldValue}>{age}</Text>
-              <Text style={styles.unitText}>YRS</Text>
+            <View style={styles.ageClassBadge}>
+              <Ionicons name="sparkles" size={10} color={colors.accentGold} />
+              <Text style={styles.ageClassBadgeText}>{getMetabolicClassification(age).code}</Text>
             </View>
           </View>
 
-          {/* Interactive Age Scroll Ruler */}
-          <View style={styles.rulerContainer}>
-            {/* Center Yellow Line Pointer */}
-            <View style={styles.centerPointerWrapper} pointerEvents="none">
-              <View style={styles.centerYellowLine} />
-              <Text style={styles.centerValueText}>{age}</Text>
+          {/* Main Age Card */}
+          <View style={styles.ageCard}>
+            {/* Glowing top accent line */}
+            <View style={styles.ageCardTopAccent} />
+
+            {/* Hero Age Ring - Tap to Edit */}
+            <Pressable onPress={handleOpenEditModal} style={styles.ageHeroContainer}>
+              {/* Outer glow ring */}
+              <View style={styles.ageOuterRing}>
+                {/* Inner ring */}
+                <View style={styles.ageInnerRing}>
+                  <Text style={styles.ageHeroValue}>{age}</Text>
+                  <Text style={styles.ageHeroUnit}>YEARS</Text>
+                </View>
+              </View>
+            </Pressable>
+
+            {/* Stepper Controls */}
+            <View style={styles.ageStepperRow}>
+              <Pressable
+                onPress={() => handleSelectAge(age - 5)}
+                disabled={age <= MIN_AGE}
+                style={[styles.ageStepBtn, styles.ageStepBtnLarge, age <= MIN_AGE && styles.ageStepBtnDisabled]}
+                hitSlop={6}
+              >
+                <Text style={[styles.ageStepBtnText, age <= MIN_AGE && styles.ageStepBtnTextDisabled]}>−5</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleSelectAge(age - 1)}
+                disabled={age <= MIN_AGE}
+                style={[styles.ageStepBtn, age <= MIN_AGE && styles.ageStepBtnDisabled]}
+                hitSlop={6}
+              >
+                <Feather name="minus" size={18} color={age <= MIN_AGE ? '#3F3F46' : '#FFFFFF'} />
+              </Pressable>
+
+              <View style={styles.ageStepDivider} />
+
+              <Pressable
+                onPress={() => handleSelectAge(age + 1)}
+                disabled={age >= MAX_AGE}
+                style={[styles.ageStepBtn, age >= MAX_AGE && styles.ageStepBtnDisabled]}
+                hitSlop={6}
+              >
+                <Feather name="plus" size={18} color={age >= MAX_AGE ? '#3F3F46' : '#FFFFFF'} />
+              </Pressable>
+              <Pressable
+                onPress={() => handleSelectAge(age + 5)}
+                disabled={age >= MAX_AGE}
+                style={[styles.ageStepBtn, styles.ageStepBtnLarge, age >= MAX_AGE && styles.ageStepBtnDisabled]}
+                hitSlop={6}
+              >
+                <Text style={[styles.ageStepBtnText, age >= MAX_AGE && styles.ageStepBtnTextDisabled]}>+5</Text>
+              </Pressable>
             </View>
 
-            <ScrollView
-              ref={ageScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              scrollEventThrottle={16}
-              onScroll={handleAgeScroll}
-              decelerationRate="fast"
-              snapToInterval={AGE_TICK_SPACING}
-              contentContainerStyle={styles.ageScrollContent}
-            >
-              {Array.from({ length: MAX_AGE - MIN_AGE + 1 }).map((_, i) => {
-                const val = MIN_AGE + i;
-                const isSelected = val === age;
-                const isMajor = val % 5 === 0;
-                return (
-                  <View key={val} style={[styles.ageTickItem, { width: AGE_TICK_SPACING }]}>
-                    <View
-                      style={[
-                        styles.ageTickLine,
-                        isSelected
-                          ? styles.ageTickLineSelected
-                          : isMajor
-                          ? styles.ageTickLineMajor
-                          : styles.ageTickLineMinor,
-                      ]}
-                    />
-                    {isMajor ? (
-                      <Text style={[styles.ageTickNumber, isSelected && styles.ageTickNumberSelected]}>
-                        {val}
+            {/* Horizontal Age Ruler */}
+            <View style={styles.ageRulerWrapper}>
+              <View style={styles.ageRulerPointer} pointerEvents="none">
+                <View style={styles.ageRulerPointerLine} />
+              </View>
+              <ScrollView
+                ref={ageScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onScroll={handleAgeScroll}
+                decelerationRate="fast"
+                snapToInterval={AGE_TICK_SPACING}
+                contentContainerStyle={styles.ageRulerScrollContent}
+              >
+                {Array.from({ length: MAX_AGE - MIN_AGE + 1 }).map((_, i) => {
+                  const val = MIN_AGE + i;
+                  const isSelected = val === age;
+                  const isMajor = val % 5 === 0;
+                  return (
+                    <View key={val} style={[styles.ageRulerTick, { width: AGE_TICK_SPACING }]}>
+                      <View
+                        style={[
+                          styles.ageRulerTickLine,
+                          isSelected
+                            ? styles.ageRulerTickSelected
+                            : isMajor
+                            ? styles.ageRulerTickMajor
+                            : styles.ageRulerTickMinor,
+                        ]}
+                      />
+                      {isMajor && (
+                        <Text style={[styles.ageRulerTickLabel, isSelected && styles.ageRulerTickLabelSelected]}>
+                          {val}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Quick Age Presets */}
+            <View style={styles.agePresetsContainer}>
+              <Text style={styles.agePresetsLabel}>QUICK SELECT</Text>
+              <View style={styles.agePresetsGrid}>
+                {AGE_PRESETS.map((presetVal) => {
+                  const isActive = age === presetVal;
+                  return (
+                    <Pressable
+                      key={presetVal}
+                      onPress={() => handleSelectAge(presetVal)}
+                      style={[styles.agePresetChip, isActive && styles.agePresetChipActive]}
+                    >
+                      <Text style={[styles.agePresetChipText, isActive && styles.agePresetChipTextActive]}>
+                        {presetVal}
                       </Text>
-                    ) : (
-                      <Text style={styles.ageTickEmpty}></Text>
-                    )}
-                  </View>
-                );
-              })}
-            </ScrollView>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
           </View>
+
         </Animated.View>
 
-        {/* ─── Section 3: System Terminal Note Box ─── */}
-        <Animated.View style={[styles.terminalNoteBox, fadeSlideStyle(noteAnim)]}>
-          <View style={styles.terminalIconWrapper}>
-            <Feather name="terminal" size={16} color="#3B82F6" />
-          </View>
-          <Text style={styles.terminalText}>
-            Physical identity established as the primary vector for Hunter optimization. Calibrating
-            metabolic thresholds based on input parameters...
-          </Text>
-        </Animated.View>
       </ScrollView>
 
       {/* ─── Bottom CTA Button ─── */}
@@ -289,6 +412,94 @@ export default function BiometricsScreen() {
           labelStyle={styles.ctaLabel}
         />
       </Animated.View>
+
+      {/* ─── Modern Edit Age Bottom Sheet Modal ─── */}
+      <Modal
+        visible={isModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setIsModalOpen(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>EDIT TEMPORAL AGE</Text>
+              <Pressable onPress={() => setIsModalOpen(false)} hitSlop={10}>
+                <Feather name="x" size={20} color="#A1A1AA" />
+              </Pressable>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Specify your baseline age within the system bounds ({MIN_AGE} – {MAX_AGE} YRS).
+            </Text>
+
+            {/* Stepper & Manual Input Row */}
+            <View style={styles.modalInputRow}>
+              <Pressable
+                onPress={handleDecrement}
+                style={styles.stepperButton}
+                hitSlop={6}
+              >
+                <Feather name="minus" size={20} color="#FFFFFF" />
+              </Pressable>
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={inputAge}
+                  onChangeText={(txt) => {
+                    setInputAge(txt);
+                    setErrorMsg('');
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  selectTextOnFocus
+                />
+                <Text style={styles.modalInputUnit}>YRS</Text>
+              </View>
+
+              <Pressable
+                onPress={handleIncrement}
+                style={styles.stepperButton}
+                hitSlop={6}
+              >
+                <Feather name="plus" size={20} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
+            {/* Validation Error Message */}
+            {!!errorMsg && (
+              <View style={styles.errorContainer}>
+                <Feather name="alert-circle" size={14} color="#EF4444" />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.modalActionRow}>
+              <Pressable
+                style={styles.modalCancelButton}
+                onPress={() => setIsModalOpen(false)}
+              >
+                <Text style={styles.modalCancelText}>CANCEL</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.modalSaveButton}
+                onPress={handleSaveAge}
+              >
+                <Text style={styles.modalSaveText}>SAVE</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </Screen>
   );
 }
@@ -355,48 +566,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
 
-  /* ─── Header Row ─── */
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 8,
-    backgroundColor: '#0F0F11',
-    borderWidth: 1,
-    borderColor: '#222226',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  sectionLabel: {
-    fontFamily: fontFamilies.semiBold,
-    fontSize: 11,
-    letterSpacing: 2,
-    color: '#71717A',
-    textTransform: 'uppercase',
-  },
-  valueWrapper: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  goldValue: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 34,
-    color: colors.accentGold,
-    marginRight: 4,
-  },
-  unitText: {
-    fontFamily: fontFamilies.semiBold,
-    fontSize: 10,
-    color: '#71717A',
-    textTransform: 'uppercase',
-  },
-
   /* ─── Gender Cards ─── */
   genderRow: {
     flexDirection: 'row',
@@ -439,76 +608,341 @@ const styles = StyleSheet.create({
     color: colors.accentGold,
   },
 
-  /* ─── Age Section ─── */
-  rulerContainer: {
-    backgroundColor: '#09090B',
-    borderRadius: 12,
+  /* ─── Temporal Age Section ─── */
+  ageTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  ageTitleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ageTitleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(229, 169, 60, 0.1)',
     borderWidth: 1,
-    borderColor: '#1B1B1E',
-    height: 96,
-    position: 'relative',
+    borderColor: 'rgba(229, 169, 60, 0.25)',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  centerPointerWrapper: {
-    position: 'absolute',
-    left: '50%',
-    top: 14,
-    transform: [{ translateX: -1.25 }],
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  centerYellowLine: {
-    width: 2.5,
-    height: 34,
-    backgroundColor: colors.accentGold,
-    borderRadius: 2,
-    marginBottom: 4,
-    shadowColor: colors.accentGold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  centerValueText: {
+  ageTitleText: {
     fontFamily: fontFamilies.bold,
     fontSize: 13,
+    letterSpacing: 2.5,
+    color: '#D4D4D8',
+  },
+  ageClassBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(229, 169, 60, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(229, 169, 60, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  ageClassBadgeText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 10,
+    letterSpacing: 1.5,
     color: colors.accentGold,
   },
-  ageScrollContent: {
-    paddingHorizontal: '50%',
-    alignItems: 'center',
-    paddingTop: 14,
+
+  /* Age Card */
+  ageCard: {
+    backgroundColor: '#0A0A0C',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#1A1A1F',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    overflow: 'hidden',
   },
-  ageTickItem: {
-    alignItems: 'center',
+  ageCardTopAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 40,
+    right: 40,
+    height: 2,
+    backgroundColor: colors.accentGold,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+    shadowColor: colors.accentGold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  ageTickLine: {
+
+  /* Hero Age Ring */
+  ageHeroContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  ageOuterRing: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 2,
+    borderColor: 'rgba(229, 169, 60, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.accentGold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+  },
+  ageInnerRing: {
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    borderWidth: 1.5,
+    borderColor: 'rgba(229, 169, 60, 0.35)',
+    backgroundColor: 'rgba(229, 169, 60, 0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ageHeroValue: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 48,
+    lineHeight: 52,
+    color: colors.accentGold,
+    shadowColor: colors.accentGold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+  },
+  ageHeroUnit: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 10,
+    letterSpacing: 3,
+    color: '#71717A',
+    marginTop: -2,
+  },
+  ageEditHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
+    backgroundColor: 'rgba(229, 169, 60, 0.06)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  ageEditHintText: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    color: colors.accentGold,
+  },
+
+  /* Stepper Row */
+  ageStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  ageStepBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#111114',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ageStepBtnLarge: {
+    width: 52,
+    backgroundColor: '#0E0E11',
+    borderColor: '#222226',
+  },
+  ageStepBtnDisabled: {
+    opacity: 0.3,
+    borderColor: '#18181B',
+  },
+  ageStepBtnText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  ageStepBtnTextDisabled: {
+    color: '#3F3F46',
+  },
+  ageStepDivider: {
     width: 1,
-    borderRadius: 0.5,
+    height: 20,
+    backgroundColor: '#27272A',
+    marginHorizontal: 4,
   },
-  ageTickLineMinor: {
-    height: 10,
+
+  /* Age Ruler */
+  ageRulerWrapper: {
+    backgroundColor: '#060608',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#18181C',
+    height: 68,
+    position: 'relative',
+    justifyContent: 'center',
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  ageRulerPointer: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    transform: [{ translateX: -1 }],
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    zIndex: 10,
+  },
+  ageRulerPointerLine: {
+    width: 2,
+    height: '100%',
+    backgroundColor: colors.accentGold,
+    borderRadius: 1,
+    shadowColor: colors.accentGold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  ageRulerScrollContent: {
+    paddingHorizontal: '50%',
+    alignItems: 'flex-end',
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  ageRulerTick: {
+    alignItems: 'center',
+  },
+  ageRulerTickLine: {
+    width: 1.5,
+    borderRadius: 0.75,
+  },
+  ageRulerTickMinor: {
+    height: 12,
     backgroundColor: '#27272A',
   },
-  ageTickLineMajor: {
-    height: 18,
+  ageRulerTickMajor: {
+    height: 22,
     backgroundColor: '#52525B',
   },
-  ageTickLineSelected: {
+  ageRulerTickSelected: {
     height: 0,
   },
-  ageTickNumber: {
-    fontFamily: fontFamilies.regular,
-    fontSize: 11,
+  ageRulerTickLabel: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 10,
     color: '#52525B',
-    marginTop: 10,
+    marginTop: 6,
   },
-  ageTickNumberSelected: {
-    opacity: 0,
+  ageRulerTickLabelSelected: {
+    color: colors.accentGold,
+    fontFamily: fontFamilies.bold,
   },
-  ageTickEmpty: {
+
+  /* Age Presets */
+  agePresetsContainer: {
+    gap: 10,
+  },
+  agePresetsLabel: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 9,
+    letterSpacing: 2,
+    color: '#52525B',
+  },
+  agePresetsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  agePresetChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#111114',
+    borderWidth: 1,
+    borderColor: '#222226',
+  },
+  agePresetChipActive: {
+    backgroundColor: colors.accentGold,
+    borderColor: colors.accentGold,
+    shadowColor: colors.accentGold,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  agePresetChipText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 13,
+    color: '#A1A1AA',
+  },
+  agePresetChipTextActive: {
+    color: '#000000',
+  },
+
+  /* Metabolic Classification Banner */
+  ageMetaBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 14,
+    backgroundColor: 'rgba(229, 169, 60, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(229, 169, 60, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  ageMetaIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(229, 169, 60, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ageMetaTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  ageMetaLabel: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 8,
+    letterSpacing: 2,
+    color: '#71717A',
+  },
+  ageMetaValue: {
+    fontFamily: fontFamilies.bold,
     fontSize: 11,
-    marginTop: 10,
+    letterSpacing: 0.5,
+    color: colors.accentGold,
+  },
+  ageMetaCodeWrap: {
+    backgroundColor: 'rgba(229, 169, 60, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(229, 169, 60, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  ageMetaCode: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.accentGold,
   },
 
   /* ─── Terminal Note Box ─── */
@@ -552,6 +986,141 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.bold,
     fontSize: 14,
     letterSpacing: 2,
+    color: '#000000',
+  },
+
+  /* ─── Edit Modal / Bottom Sheet ─── */
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  },
+  modalSheet: {
+    backgroundColor: '#0D0D0E',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#27272A',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 16,
+    letterSpacing: 1.5,
+    color: '#FFFFFF',
+  },
+  modalSubtitle: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 12,
+    color: '#A1A1AA',
+    marginBottom: 20,
+  },
+  modalInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  stepperButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#3F3F46',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  modalTextInput: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 32,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    minWidth: 50,
+  },
+  modalInputUnit: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 12,
+    color: '#71717A',
+    marginLeft: 4,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  errorText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    color: '#EF4444',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalCancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 12,
+    letterSpacing: 1.5,
+    color: '#A1A1AA',
+  },
+  modalSaveButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSaveText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 12,
+    letterSpacing: 1.5,
     color: '#000000',
   },
 });

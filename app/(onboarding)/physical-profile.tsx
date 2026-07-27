@@ -3,12 +3,15 @@ import { router } from 'expo-router';
 import {
   Animated,
   Easing,
+  KeyboardAvoidingView,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -24,7 +27,7 @@ const TOTAL_STEPS = 8;
 const CURRENT_STEP = 2; // third step (0-indexed)
 
 // Height Ruler constants
-const MIN_HEIGHT = 130;
+const MIN_HEIGHT = 80;
 const MAX_HEIGHT = 230;
 const TICK_SPACING = 16; // pixels per 1 cm
 
@@ -32,13 +35,44 @@ const TICK_SPACING = 16; // pixels per 1 cm
 const MIN_WEIGHT = 40;
 const MAX_WEIGHT = 160;
 
+const KG_TO_LBS = 2.20462;
+
+const cmToFtIn = (cm: number) => {
+  const totalInches = cm / 2.54;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return {
+    feet,
+    inches,
+    str: `${feet}'${inches}"`,
+  };
+};
+
 export default function PhysicalProfileScreen() {
-  const [height, setHeight] = useState(181);
-  const [weight, setWeight] = useState(75.0);
-  const [targetWeight, setTargetWeight] = useState(82.5);
+  const [height, setHeight] = useState(181); // stored in CM internally
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>('cm');
+  const [weight, setWeight] = useState(75.0); // stored in KG internally
+  const [targetWeight, setTargetWeight] = useState(82.5); // stored in KG internally
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+
+  // Edit Height Modal state
+  const [isHeightModalOpen, setIsHeightModalOpen] = useState(false);
+  const [inputHeight, setInputHeight] = useState('181');
+  const [heightError, setHeightError] = useState('');
+
+  // Edit Weight Modal state
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [inputWeight, setInputWeight] = useState('75.0');
+  const [weightError, setWeightError] = useState('');
 
   const rulerScrollRef = useRef<ScrollView>(null);
   const startWeightRef = useRef(targetWeight);
+
+  // Computed displayed weights & min/max bounds
+  const displayWeight = weightUnit === 'kg' ? weight : weight * KG_TO_LBS;
+  const displayTargetWeight = weightUnit === 'kg' ? targetWeight : targetWeight * KG_TO_LBS;
+  const minWeightVal = 40; // minimum weight is 40 in either unit as requested
+  const maxWeightVal = weightUnit === 'kg' ? 160 : 350;
 
   // Animations
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -92,13 +126,12 @@ export default function PhysicalProfileScreen() {
       onPanResponderMove: (_, gestureState) => {
         // Horizontal drag sensitivity
         const delta = gestureState.dx / 12;
-        const newTarget = Math.max(
+        const newWeight = Math.max(
           MIN_WEIGHT,
           Math.min(MAX_WEIGHT, Number((startWeightRef.current + delta).toFixed(1)))
         );
-        setTargetWeight(newTarget);
-        // Synchronize current weight smoothly
-        setWeight(Number(Math.max(35, newTarget - 7.5).toFixed(1)));
+        setTargetWeight(newWeight);
+        setWeight(newWeight);
       },
     })
   ).current;
@@ -125,6 +158,87 @@ export default function PhysicalProfileScreen() {
     const clampedHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, computedHeight));
     if (clampedHeight !== height) {
       setHeight(clampedHeight);
+    }
+  };
+
+  const handleOpenHeightModal = () => {
+    setInputHeight(height.toString());
+    setHeightError('');
+    setIsHeightModalOpen(true);
+  };
+
+  const handleSaveHeight = () => {
+    const parsed = parseInt(inputHeight, 10);
+    if (isNaN(parsed) || parsed < MIN_HEIGHT || parsed > MAX_HEIGHT) {
+      setHeightError(`Height must be between ${MIN_HEIGHT} and ${MAX_HEIGHT} CM.`);
+      return;
+    }
+    setHeight(parsed);
+    setIsHeightModalOpen(false);
+
+    // Scroll height ruler smoothly to new target
+    const targetX = (parsed - MIN_HEIGHT) * TICK_SPACING;
+    rulerScrollRef.current?.scrollTo({ x: targetX, animated: true });
+  };
+
+  const handleHeightIncrement = () => {
+    const parsed = parseInt(inputHeight, 10) || height;
+    if (parsed < MAX_HEIGHT) {
+      const next = parsed + 1;
+      setInputHeight(next.toString());
+      if (next >= MIN_HEIGHT && next <= MAX_HEIGHT) setHeightError('');
+    }
+  };
+
+  const handleHeightDecrement = () => {
+    const parsed = parseInt(inputHeight, 10) || height;
+    if (parsed > MIN_HEIGHT) {
+      const prev = parsed - 1;
+      setInputHeight(prev.toString());
+      if (prev >= MIN_HEIGHT && prev <= MAX_HEIGHT) setHeightError('');
+    }
+  };
+
+  const handleOpenWeightModal = () => {
+    setInputWeight(displayWeight.toFixed(1));
+    setWeightError('');
+    setIsWeightModalOpen(true);
+  };
+
+  const handleSaveWeight = () => {
+    const parsed = parseFloat(inputWeight);
+    if (isNaN(parsed) || parsed < minWeightVal || parsed > maxWeightVal) {
+      setWeightError(`Weight must be between ${minWeightVal} and ${maxWeightVal} ${weightUnit.toUpperCase()}.`);
+      return;
+    }
+    if (weightUnit === 'kg') {
+      const clampedKg = Number(Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, parsed)).toFixed(1));
+      setWeight(clampedKg);
+      setTargetWeight(clampedKg);
+    } else {
+      const weightInKg = parsed / KG_TO_LBS;
+      const clampedKg = Number(Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, weightInKg)).toFixed(1));
+      setWeight(clampedKg);
+      setTargetWeight(clampedKg);
+    }
+    setIsWeightModalOpen(false);
+  };
+
+  const handleWeightIncrement = () => {
+    const parsed = parseFloat(inputWeight) || displayWeight;
+    if (parsed < maxWeightVal) {
+      const next = Number((parsed + 0.5).toFixed(1));
+      setInputWeight(next.toFixed(1));
+      if (next >= minWeightVal && next <= maxWeightVal) setWeightError('');
+    }
+  };
+
+  const handleWeightDecrement = () => {
+    const parsed = parseFloat(inputWeight) || displayWeight;
+    if (parsed > minWeightVal) {
+      const prev = Number((parsed - 0.5).toFixed(1));
+      setInputWeight(prev.toFixed(1));
+      if (prev >= minWeightVal && prev <= maxWeightVal) setWeightError('');
     }
   };
 
@@ -166,10 +280,40 @@ export default function PhysicalProfileScreen() {
               <MaterialCommunityIcons name="ruler" size={20} color="#FFFFFF" />
             </View>
             <Text style={styles.sectionLabel}>HEIGHT</Text>
-            <View style={styles.valueWrapper}>
-              <Text style={styles.goldValue}>{height}</Text>
-              <Text style={styles.unitText}>CM</Text>
+
+            {/* CM / FT Unit Switcher Pill */}
+            <View style={styles.unitTogglePillContainer}>
+              <Pressable
+                onPress={() => setHeightUnit('cm')}
+                style={[styles.unitToggleBtn, heightUnit === 'cm' && styles.unitToggleBtnActive]}
+                hitSlop={4}
+              >
+                <Text style={[styles.unitToggleText, heightUnit === 'cm' && styles.unitToggleTextActive]}>
+                  CM
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setHeightUnit('ft')}
+                style={[styles.unitToggleBtn, heightUnit === 'ft' && styles.unitToggleBtnActive]}
+                hitSlop={4}
+              >
+                <Text style={[styles.unitToggleText, heightUnit === 'ft' && styles.unitToggleTextActive]}>
+                  FT
+                </Text>
+              </Pressable>
             </View>
+
+            {/* Tap to Edit Height Value */}
+            <Pressable
+              onPress={handleOpenHeightModal}
+              style={styles.editableValueContainer}
+              hitSlop={10}
+            >
+              <Text style={styles.goldValue}>
+                {heightUnit === 'cm' ? height : cmToFtIn(height).str}
+              </Text>
+              <Text style={styles.unitText}>{heightUnit === 'cm' ? 'CM' : 'FT'}</Text>
+            </Pressable>
           </View>
 
           {/* Interactive Horizontal Scroll Ruler */}
@@ -177,7 +321,9 @@ export default function PhysicalProfileScreen() {
             {/* Center Pointer Indicator */}
             <View style={styles.centerPointerWrapper} pointerEvents="none">
               <View style={styles.centerYellowLine} />
-              <Text style={styles.centerValueText}>{height}</Text>
+              <Text style={styles.centerValueText}>
+                {heightUnit === 'cm' ? height : cmToFtIn(height).str}
+              </Text>
             </View>
 
             {/* Smooth ScrollView Ruler */}
@@ -203,7 +349,9 @@ export default function PhysicalProfileScreen() {
                       ]}
                     />
                     {isMajor ? (
-                      <Text style={styles.rulerTickText}>{val}</Text>
+                      <Text style={styles.rulerTickText}>
+                        {heightUnit === 'cm' ? val : cmToFtIn(val).str}
+                      </Text>
                     ) : (
                       <Text style={styles.rulerTickEmpty}></Text>
                     )}
@@ -221,10 +369,38 @@ export default function PhysicalProfileScreen() {
               <MaterialCommunityIcons name="scale-bathroom" size={20} color="#FFFFFF" />
             </View>
             <Text style={styles.sectionLabel}>WEIGHT</Text>
-            <View style={styles.valueWrapper}>
-              <Text style={styles.goldValue}>{weight.toFixed(1)}</Text>
-              <Text style={styles.unitText}>KG</Text>
+
+            {/* KG / LBS Unit Switcher Pill */}
+            <View style={styles.unitTogglePillContainer}>
+              <Pressable
+                onPress={() => setWeightUnit('kg')}
+                style={[styles.unitToggleBtn, weightUnit === 'kg' && styles.unitToggleBtnActive]}
+                hitSlop={4}
+              >
+                <Text style={[styles.unitToggleText, weightUnit === 'kg' && styles.unitToggleTextActive]}>
+                  KG
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setWeightUnit('lbs')}
+                style={[styles.unitToggleBtn, weightUnit === 'lbs' && styles.unitToggleBtnActive]}
+                hitSlop={4}
+              >
+                <Text style={[styles.unitToggleText, weightUnit === 'lbs' && styles.unitToggleTextActive]}>
+                  LBS
+                </Text>
+              </Pressable>
             </View>
+
+            {/* Tap to Edit Weight Value */}
+            <Pressable
+              onPress={handleOpenWeightModal}
+              style={styles.editableValueContainer}
+              hitSlop={10}
+            >
+              <Text style={styles.goldValue}>{displayWeight.toFixed(1)}</Text>
+              <Text style={styles.unitText}>{weightUnit.toUpperCase()}</Text>
+            </Pressable>
           </View>
 
           {/* Touch-Scrollable Circular Target Gauge Dial */}
@@ -269,15 +445,14 @@ export default function PhysicalProfileScreen() {
 
               {/* Center Target Info */}
               <View style={styles.dialCenterContent}>
-                <Text style={styles.targetLabel}>TARGET</Text>
-
                 {/* Target Weight Value + Stepper controls */}
                 <View style={styles.targetRow}>
                   <Pressable
                     onPress={() => {
-                      const newTarget = Math.max(MIN_WEIGHT, Number((targetWeight - 0.5).toFixed(1)));
-                      setTargetWeight(newTarget);
-                      setWeight(Number(Math.max(35, newTarget - 7.5).toFixed(1)));
+                      const step = weightUnit === 'kg' ? 0.5 : 0.5 / KG_TO_LBS;
+                      const next = Math.max(MIN_WEIGHT, Number((weight - step).toFixed(1)));
+                      setWeight(next);
+                      setTargetWeight(next);
                     }}
                     hitSlop={8}
                     style={styles.adjustBtn}
@@ -285,13 +460,14 @@ export default function PhysicalProfileScreen() {
                     <Feather name="minus" size={14} color="#71717A" />
                   </Pressable>
 
-                  <Text style={styles.targetValueText}>{targetWeight.toFixed(1)}</Text>
+                  <Text style={styles.targetValueText}>{displayWeight.toFixed(1)}</Text>
 
                   <Pressable
                     onPress={() => {
-                      const newTarget = Math.min(MAX_WEIGHT, Number((targetWeight + 0.5).toFixed(1)));
-                      setTargetWeight(newTarget);
-                      setWeight(Number(Math.max(35, newTarget - 7.5).toFixed(1)));
+                      const step = weightUnit === 'kg' ? 0.5 : 0.5 / KG_TO_LBS;
+                      const next = Math.min(MAX_WEIGHT, Number((weight + step).toFixed(1)));
+                      setWeight(next);
+                      setTargetWeight(next);
                     }}
                     hitSlop={8}
                     style={styles.adjustBtn}
@@ -307,6 +483,94 @@ export default function PhysicalProfileScreen() {
             </View>
           </View>
         </Animated.View>
+
+        {/* ─── Edit Weight Bottom Sheet Modal ─── */}
+        <Modal
+          visible={isWeightModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsWeightModalOpen(false)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+          >
+            <Pressable style={styles.modalBackdrop} onPress={() => setIsWeightModalOpen(false)} />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHandle} />
+
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>EDIT WEIGHT ({weightUnit.toUpperCase()})</Text>
+                <Pressable onPress={() => setIsWeightModalOpen(false)} hitSlop={10}>
+                  <Feather name="x" size={20} color="#A1A1AA" />
+                </Pressable>
+              </View>
+
+              <Text style={styles.modalSubtitle}>
+                Specify your weight within the scale bounds ({minWeightVal} – {maxWeightVal} {weightUnit.toUpperCase()}).
+              </Text>
+
+              {/* Stepper & Manual Input Row */}
+              <View style={styles.modalInputRow}>
+                <Pressable
+                  onPress={handleWeightDecrement}
+                  style={styles.stepperButton}
+                  hitSlop={6}
+                >
+                  <Feather name="minus" size={20} color="#FFFFFF" />
+                </Pressable>
+
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.modalTextInput}
+                    value={inputWeight}
+                    onChangeText={(txt) => {
+                      setInputWeight(txt);
+                      setWeightError('');
+                    }}
+                    keyboardType="decimal-pad"
+                    maxLength={5}
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.modalInputUnit}>{weightUnit.toUpperCase()}</Text>
+                </View>
+
+                <Pressable
+                  onPress={handleWeightIncrement}
+                  style={styles.stepperButton}
+                  hitSlop={6}
+                >
+                  <Feather name="plus" size={20} color="#FFFFFF" />
+                </Pressable>
+              </View>
+
+              {/* Validation Error Message */}
+              {!!weightError && (
+                <View style={styles.errorContainer}>
+                  <Feather name="alert-circle" size={14} color="#EF4444" />
+                  <Text style={styles.errorText}>{weightError}</Text>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.modalActionRow}>
+                <Pressable
+                  style={styles.modalCancelButton}
+                  onPress={() => setIsWeightModalOpen(false)}
+                >
+                  <Text style={styles.modalCancelText}>CANCEL</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.modalSaveButton}
+                  onPress={handleSaveWeight}
+                >
+                  <Text style={styles.modalSaveText}>SAVE</Text>
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </ScrollView>
 
       {/* ─── Bottom CTA ─── */}
@@ -319,6 +583,94 @@ export default function PhysicalProfileScreen() {
           labelStyle={styles.ctaLabel}
         />
       </Animated.View>
+
+      {/* ─── Edit Height Bottom Sheet Modal ─── */}
+      <Modal
+        visible={isHeightModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsHeightModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setIsHeightModalOpen(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>EDIT HEIGHT ({heightUnit.toUpperCase()})</Text>
+              <Pressable onPress={() => setIsHeightModalOpen(false)} hitSlop={10}>
+                <Feather name="x" size={20} color="#A1A1AA" />
+              </Pressable>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Specify your height within the scale bounds ({MIN_HEIGHT} – {MAX_HEIGHT} CM / {cmToFtIn(MIN_HEIGHT).str} – {cmToFtIn(MAX_HEIGHT).str}).
+            </Text>
+
+            {/* Stepper & Manual Input Row */}
+            <View style={styles.modalInputRow}>
+              <Pressable
+                onPress={handleHeightDecrement}
+                style={styles.stepperButton}
+                hitSlop={6}
+              >
+                <Feather name="minus" size={20} color="#FFFFFF" />
+              </Pressable>
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  value={inputHeight}
+                  onChangeText={(txt) => {
+                    setInputHeight(txt);
+                    setHeightError('');
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  selectTextOnFocus
+                />
+                <Text style={styles.modalInputUnit}>CM</Text>
+              </View>
+
+              <Pressable
+                onPress={handleHeightIncrement}
+                style={styles.stepperButton}
+                hitSlop={6}
+              >
+                <Feather name="plus" size={20} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
+            {/* Validation Error Message */}
+            {!!heightError && (
+              <View style={styles.errorContainer}>
+                <Feather name="alert-circle" size={14} color="#EF4444" />
+                <Text style={styles.errorText}>{heightError}</Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.modalActionRow}>
+              <Pressable
+                style={styles.modalCancelButton}
+                onPress={() => setIsHeightModalOpen(false)}
+              >
+                <Text style={styles.modalCancelText}>CANCEL</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.modalSaveButton}
+                onPress={handleSaveHeight}
+              >
+                <Text style={styles.modalSaveText}>SAVE</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </Screen>
   );
 }
@@ -414,6 +766,32 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#71717A',
     textTransform: 'uppercase',
+  },
+  unitTogglePillContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#141416',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 2,
+    marginLeft: 12,
+  },
+  unitToggleBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  unitToggleBtnActive: {
+    backgroundColor: colors.accentGold,
+  },
+  unitToggleText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 10,
+    color: '#71717A',
+  },
+  unitToggleTextActive: {
+    color: '#000000',
   },
 
   /* ─── Ruler Component ─── */
@@ -602,6 +980,153 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.bold,
     fontSize: 14,
     letterSpacing: 2,
+    color: '#000000',
+  },
+
+  editableValueContainer: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(229, 169, 60, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(229, 169, 60, 0.25)',
+  },
+
+  /* ─── Edit Modal / Bottom Sheet ─── */
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+  },
+  modalSheet: {
+    backgroundColor: '#0D0D0E',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: '#27272A',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 16,
+    letterSpacing: 1.5,
+    color: '#FFFFFF',
+  },
+  modalSubtitle: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 12,
+    color: '#A1A1AA',
+    marginBottom: 20,
+  },
+  modalInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  stepperButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#3F3F46',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  modalTextInput: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 32,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    minWidth: 50,
+  },
+  modalInputUnit: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 12,
+    color: '#71717A',
+    marginLeft: 4,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  errorText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    color: '#EF4444',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalCancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 12,
+    letterSpacing: 1.5,
+    color: '#A1A1AA',
+  },
+  modalSaveButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSaveText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 12,
+    letterSpacing: 1.5,
     color: '#000000',
   },
 });
