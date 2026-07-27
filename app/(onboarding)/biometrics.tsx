@@ -17,6 +17,7 @@ import { Screen } from '@/components/common/Screen';
 import { StepIndicator } from '@/components/common/StepIndicator';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { soundManager } from '@/utils/soundManager';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 1; // second step (0-indexed)
@@ -26,7 +27,7 @@ const MAX_AGE = 80;
 const AGE_TICK_SPACING = 24;
 
 export default function BiometricsScreen() {
-  const [gender, setGender] = useState<'male' | 'female'>('male');
+  const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
   const [age, setAge] = useState(24);
 
   const ageScrollRef = useRef<ScrollView>(null);
@@ -133,11 +134,13 @@ export default function BiometricsScreen() {
         {/* ─── Section 1: GENETIC PROFILE ─── */}
         <Animated.View style={[styles.sectionContainer, fadeSlideStyle(genderAnim)]}>
           <Text style={styles.sectionTitle}>GENETIC PROFILE</Text>
-
           <View style={styles.genderRow}>
             {/* Male Card */}
             <Pressable
-              onPress={() => setGender('male')}
+              onPress={() => {
+                soundManager.play('select');
+                setGender('male');
+              }}
               style={[
                 styles.genderCard,
                 gender === 'male' && styles.genderCardSelected,
@@ -146,7 +149,7 @@ export default function BiometricsScreen() {
               {gender === 'male' && <View style={styles.cornerAccent} />}
               <Ionicons
                 name="male"
-                size={34}
+                size={30}
                 color={gender === 'male' ? colors.accentGold : '#71717A'}
                 style={styles.genderIcon}
               />
@@ -157,7 +160,10 @@ export default function BiometricsScreen() {
 
             {/* Female Card */}
             <Pressable
-              onPress={() => setGender('female')}
+              onPress={() => {
+                soundManager.play('select');
+                setGender('female');
+              }}
               style={[
                 styles.genderCard,
                 gender === 'female' && styles.genderCardSelected,
@@ -166,12 +172,35 @@ export default function BiometricsScreen() {
               {gender === 'female' && <View style={styles.cornerAccent} />}
               <Ionicons
                 name="female"
-                size={34}
+                size={30}
                 color={gender === 'female' ? colors.accentGold : '#71717A'}
                 style={styles.genderIcon}
               />
               <Text style={[styles.genderText, gender === 'female' && styles.genderTextSelected]}>
                 FEMALE
+              </Text>
+            </Pressable>
+
+            {/* Other Card */}
+            <Pressable
+              onPress={() => {
+                soundManager.play('select');
+                setGender('other');
+              }}
+              style={[
+                styles.genderCard,
+                gender === 'other' && styles.genderCardSelected,
+              ]}
+            >
+              {gender === 'other' && <View style={styles.cornerAccent} />}
+              <Ionicons
+                name="transgender"
+                size={30}
+                color={gender === 'other' ? colors.accentGold : '#71717A'}
+                style={styles.genderIcon}
+              />
+              <Text style={[styles.genderText, gender === 'other' && styles.genderTextSelected]}>
+                OTHER
               </Text>
             </Pressable>
           </View>
@@ -371,11 +400,11 @@ const styles = StyleSheet.create({
   /* ─── Gender Cards ─── */
   genderRow: {
     flexDirection: 'row',
-    gap: 14,
+    gap: 10,
   },
   genderCard: {
     flex: 1,
-    height: 124,
+    height: 116,
     borderRadius: 10,
     backgroundColor: '#0B0B0D',
     borderWidth: 1,
