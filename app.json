@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Arise",
-    "slug": "arise-mobile",
+    "slug": "shakthi",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.arise.mobile"
+      "bundleIdentifier": "com.arise.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.arise.mobile",
@@ -40,10 +43,20 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 160
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-font",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8c22f478-6a62-4a5f-99a0-d8cc4e697584"
+      }
+    },
+    "owner": "shakthi24s-team"
   }
 }

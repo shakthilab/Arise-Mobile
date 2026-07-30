@@ -14,8 +14,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 
 import { Button } from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
@@ -54,6 +55,16 @@ export default function PhysicalProfileScreen() {
   const [weight, setWeight] = useState(75.0); // stored in KG internally
   const [targetWeight, setTargetWeight] = useState(82.5); // stored in KG internally
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+
+  const weightRef = useRef(weight);
+  weightRef.current = weight;
+
+  const targetWeightRef = useRef(targetWeight);
+  targetWeightRef.current = targetWeight;
+
+  const weightUnitRef = useRef(weightUnit);
+  weightUnitRef.current = weightUnit;
 
   // Edit Height Modal state
   const [isHeightModalOpen, setIsHeightModalOpen] = useState(false);
@@ -67,6 +78,14 @@ export default function PhysicalProfileScreen() {
 
   const rulerScrollRef = useRef<ScrollView>(null);
   const startWeightRef = useRef(targetWeight);
+
+  const triggerHaptic = () => {
+    try {
+      Haptics.selectionAsync();
+    } catch (e) {
+      console.warn('Failed to trigger haptics', e);
+    }
+  };
 
   // Computed displayed weights & min/max bounds
   const displayWeight = weightUnit === 'kg' ? weight : weight * KG_TO_LBS;
@@ -121,7 +140,8 @@ export default function PhysicalProfileScreen() {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        startWeightRef.current = targetWeight;
+        startWeightRef.current = targetWeightRef.current;
+        setScrollEnabled(false);
       },
       onPanResponderMove: (_, gestureState) => {
         // Horizontal drag sensitivity
@@ -130,8 +150,27 @@ export default function PhysicalProfileScreen() {
           MIN_WEIGHT,
           Math.min(MAX_WEIGHT, Number((startWeightRef.current + delta).toFixed(1)))
         );
+
+        // Calculate display weight before and after change
+        const currentDisplay = weightUnitRef.current === 'kg' ? weightRef.current : weightRef.current * KG_TO_LBS;
+        const newDisplay = weightUnitRef.current === 'kg' ? newWeight : newWeight * KG_TO_LBS;
+
+        // Trigger haptic every 0.5 increment of the active display unit
+        const currentRounded = Math.round(currentDisplay * 2) / 2;
+        const newRounded = Math.round(newDisplay * 2) / 2;
+
+        if (newRounded !== currentRounded) {
+          triggerHaptic();
+        }
+
         setTargetWeight(newWeight);
         setWeight(newWeight);
+      },
+      onPanResponderRelease: () => {
+        setScrollEnabled(true);
+      },
+      onPanResponderTerminate: () => {
+        setScrollEnabled(true);
       },
     })
   ).current;
@@ -158,6 +197,7 @@ export default function PhysicalProfileScreen() {
     const clampedHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, computedHeight));
     if (clampedHeight !== height) {
       setHeight(clampedHeight);
+      triggerHaptic();
     }
   };
 
@@ -261,24 +301,22 @@ export default function PhysicalProfileScreen() {
 
       {/* ─── Scrollable Content ─── */}
       <ScrollView
+        scrollEnabled={scrollEnabled}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Title Header */}
         <Animated.View style={fadeSlideStyle(headerAnim)}>
-          <Text style={styles.title}>Your physical profile.</Text>
+          <Text style={styles.title}>Your physical profile</Text>
           <Text style={styles.description}>
-            Precision data leads to pro-athlete results.
+            Precision data leads to pro-athlete results
           </Text>
         </Animated.View>
 
         {/* ─── Height Section ─── */}
         <Animated.View style={[styles.cardSection, fadeSlideStyle(heightAnim)]}>
           <View style={styles.headerRow}>
-            <View style={styles.iconBox}>
-              <MaterialCommunityIcons name="ruler" size={20} color="#FFFFFF" />
-            </View>
             <Text style={styles.sectionLabel}>HEIGHT</Text>
 
             {/* CM / FT Unit Switcher Pill */}
@@ -330,6 +368,9 @@ export default function PhysicalProfileScreen() {
             <ScrollView
               ref={rulerScrollRef}
               horizontal
+              onScrollBeginDrag={() => setScrollEnabled(false)}
+              onScrollEndDrag={() => setScrollEnabled(true)}
+              onMomentumScrollEnd={() => setScrollEnabled(true)}
               showsHorizontalScrollIndicator={false}
               scrollEventThrottle={16}
               onScroll={handleRulerScroll}
@@ -365,9 +406,6 @@ export default function PhysicalProfileScreen() {
         {/* ─── Weight & Target Section ─── */}
         <Animated.View style={[styles.cardSection, fadeSlideStyle(weightAnim)]}>
           <View style={styles.headerRow}>
-            <View style={styles.iconBox}>
-              <MaterialCommunityIcons name="scale-bathroom" size={20} color="#FFFFFF" />
-            </View>
             <Text style={styles.sectionLabel}>WEIGHT</Text>
 
             {/* KG / LBS Unit Switcher Pill */}
@@ -451,8 +489,11 @@ export default function PhysicalProfileScreen() {
                     onPress={() => {
                       const step = weightUnit === 'kg' ? 0.5 : 0.5 / KG_TO_LBS;
                       const next = Math.max(MIN_WEIGHT, Number((weight - step).toFixed(1)));
-                      setWeight(next);
-                      setTargetWeight(next);
+                      if (next !== weight) {
+                        setWeight(next);
+                        setTargetWeight(next);
+                        triggerHaptic();
+                      }
                     }}
                     hitSlop={8}
                     style={styles.adjustBtn}
@@ -466,8 +507,11 @@ export default function PhysicalProfileScreen() {
                     onPress={() => {
                       const step = weightUnit === 'kg' ? 0.5 : 0.5 / KG_TO_LBS;
                       const next = Math.min(MAX_WEIGHT, Number((weight + step).toFixed(1)));
-                      setWeight(next);
-                      setTargetWeight(next);
+                      if (next !== weight) {
+                        setWeight(next);
+                        setTargetWeight(next);
+                        triggerHaptic();
+                      }
                     }}
                     hitSlop={8}
                     style={styles.adjustBtn}
@@ -901,7 +945,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   ticksRotator: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -987,12 +1031,6 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'baseline',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(229, 169, 60, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(229, 169, 60, 0.25)',
   },
 
   /* ─── Edit Modal / Bottom Sheet ─── */
@@ -1001,7 +1039,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalBackdrop: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
   },
   modalSheet: {
@@ -1048,9 +1086,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   stepperButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     backgroundColor: '#18181B',
     borderWidth: 1,
     borderColor: '#27272A',
@@ -1059,26 +1097,28 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    backgroundColor: '#18181B',
+    alignItems: 'center',
+    backgroundColor: '#111114',
     borderWidth: 1,
-    borderColor: '#3F3F46',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    minWidth: 120,
+    borderColor: '#27272A',
+    borderRadius: 16,
+    height: 56,
+    minWidth: 150,
     justifyContent: 'center',
+    paddingHorizontal: 16,
   },
   modalTextInput: {
     fontFamily: fontFamilies.bold,
-    fontSize: 32,
+    fontSize: 30,
     color: '#FFFFFF',
     textAlign: 'center',
-    minWidth: 50,
+    minWidth: 70,
+    paddingVertical: 0,
+    height: '100%',
   },
   modalInputUnit: {
     fontFamily: fontFamilies.semiBold,
-    fontSize: 12,
+    fontSize: 13,
     color: '#71717A',
     marginLeft: 4,
   },
@@ -1101,9 +1141,9 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     flex: 1,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: '#18181B',
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: '#111114',
     borderWidth: 1,
     borderColor: '#27272A',
     alignItems: 'center',
@@ -1112,13 +1152,13 @@ const styles = StyleSheet.create({
   modalCancelText: {
     fontFamily: fontFamilies.bold,
     fontSize: 12,
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     color: '#A1A1AA',
   },
   modalSaveButton: {
     flex: 1,
-    height: 48,
-    borderRadius: 10,
+    height: 52,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1126,7 +1166,7 @@ const styles = StyleSheet.create({
   modalSaveText: {
     fontFamily: fontFamilies.bold,
     fontSize: 12,
-    letterSpacing: 1.5,
+    letterSpacing: 2,
     color: '#000000',
   },
 });

@@ -120,7 +120,7 @@ export const DustParticles = React.memo(DustParticlesComponent);
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
   particle: {
