@@ -21,6 +21,7 @@ import { Button } from '@/components/common/Button';
 import { DustParticles } from '@/components/common/DustParticles';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { forgotPassword } from '@/services/api/auth.service';
 
 const HERO_ASPECT_RATIO = 1264 / 848; // image height / image width
 const HERO_TOP_OFFSET = 55;
@@ -35,6 +36,8 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // Staggered slide-up entrance animation
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -115,12 +118,24 @@ export default function ForgotPasswordScreen() {
   });
 
   const handleSendRecovery = async () => {
-    if (!email) return;
+    if (!email.trim()) return;
+    setError(null);
+    setSuccess(null);
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const msg = await forgotPassword(email.trim());
+      setSuccess(msg);
+      setTimeout(() => {
+        router.push({
+          pathname: '/(auth)/recovery-sent',
+          params: { email: email.trim() },
+        });
+      }, 800);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-      router.push('/(auth)/recovery-sent');
-    }, 1200);
+    }
   };
 
   return (
@@ -202,6 +217,14 @@ export default function ForgotPasswordScreen() {
               <Text style={styles.helpText}>
                 Check your spam folder if you don't receive it within 2 minutes.
               </Text>
+
+              {/* Error Banner */}
+              {error ? (
+                <View style={styles.errorBanner}>
+                  <Feather name="alert-circle" size={14} color="#EF4444" style={{ marginRight: 6 }} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
 
               {/* Send Recovery Button */}
               <Button
@@ -369,5 +392,22 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     color: '#FFFFFF',
     textDecorationLine: 'underline',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 13,
+    color: '#EF4444',
+    flex: 1,
   },
 });

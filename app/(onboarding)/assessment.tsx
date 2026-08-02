@@ -17,6 +17,7 @@ import { Screen } from '@/components/common/Screen';
 import { StepIndicator } from '@/components/common/StepIndicator';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useOnboardingStore } from '@/store/useOnboardingStore';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 5; // sixth step (0-indexed)
@@ -80,7 +81,9 @@ const RANKS: RankOption[] = [
 ];
 
 export default function AssessmentScreen() {
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const storeRank = useOnboardingStore((s) => s.rank);
+    const setRankStore = useOnboardingStore((s) => s.setRank);
+    const [selectedId, setSelectedId] = useState<string | null>(storeRank);
 
     // Animations
     const headerAnim = useRef(new Animated.Value(0)).current;
@@ -124,6 +127,7 @@ export default function AssessmentScreen() {
 
     const handleContinue = () => {
         if (!selectedId) return;
+        setRankStore(selectedId);
         // Navigate to step 5: time
         router.push('/(onboarding)/time');
     };

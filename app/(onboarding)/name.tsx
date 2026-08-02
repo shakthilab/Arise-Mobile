@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import {
     Animated,
     Easing,
@@ -20,13 +20,16 @@ import { StepIndicator } from '@/components/common/StepIndicator';
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useOnboardingStore } from '@/store/useOnboardingStore';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 0; // first step (0-indexed)
 
 export default function OnboardingNameScreen() {
     const { completeOnboarding } = useAuth();
-    const [hunterName, setHunterName] = useState('');
+    const storeHunterName = useOnboardingStore((s) => s.hunterName);
+    const setHunterNameStore = useOnboardingStore((s) => s.setHunterName);
+    const [hunterName, setHunterName] = useState(storeHunterName);
     const [isFocused, setIsFocused] = useState(false);
 
     // Animations
@@ -71,6 +74,7 @@ export default function OnboardingNameScreen() {
 
     const handleContinue = () => {
         if (!hunterName.trim()) return;
+        setHunterNameStore(hunterName.trim());
         // Navigate to step 2: biometrics baseline
         router.push('/(onboarding)/biometrics');
     };
@@ -143,14 +147,7 @@ export default function OnboardingNameScreen() {
                             )}
                         </View>
 
-                        {/* Info Tip */}
-                        <View style={styles.tipContainer}>
-                            <Text style={styles.tipIcon}>◆</Text>
-                            <Text style={styles.tipText}>
-                                Your name is your <Text style={styles.tipBold}>sign!</Text> It cannot be changed once
-                                the gate opens.
-                            </Text>
-                        </View>
+
                     </Animated.View>
                 </ScrollView>
 
@@ -287,6 +284,23 @@ const styles = StyleSheet.create({
     tipBold: {
         fontFamily: fontFamilies.semiBold,
         color: colors.accentGold,
+    },
+    loginLinkContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 24,
+    },
+    loginPrefix: {
+        fontFamily: fontFamilies.regular,
+        fontSize: 14,
+        color: '#71717A',
+    },
+    loginLink: {
+        fontFamily: fontFamilies.medium,
+        fontSize: 14,
+        color: '#FFFFFF',
+        textDecorationLine: 'underline',
     },
 
     /* ─── Bottom CTA ─── */

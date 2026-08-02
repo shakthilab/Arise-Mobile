@@ -1,12 +1,38 @@
 import { create } from 'zustand';
 
 type OnboardingStore = {
+  // User Profile fields
+  hunterName: string;
+  gender: 'male' | 'female' | 'other';
+  age: number;
+  height: number; // CM internally
+  heightUnit: 'cm' | 'ft';
+  weight: number; // KG internally
+  weightUnit: 'kg' | 'lbs';
+  weaknesses: string[];
+  rank: string | null;
+  verifiedEmail: string | null;
+
   // Motivation screen selection ("What do you want to level up?")
   motivationId: string | null;
-  setMotivationId: (id: string) => void;
 
   // Time screen selection ("Commit daily")
+  dailyTimeId: string | null;
   dailyTimeLabel: string | null;
+
+  // Setters
+  setHunterName: (name: string) => void;
+  setGender: (gender: 'male' | 'female' | 'other') => void;
+  setAge: (age: number) => void;
+  setHeight: (height: number) => void;
+  setHeightUnit: (unit: 'cm' | 'ft') => void;
+  setWeight: (weight: number) => void;
+  setWeightUnit: (unit: 'kg' | 'lbs') => void;
+  setWeaknesses: (weaknesses: string[]) => void;
+  setRank: (rank: string) => void;
+  setVerifiedEmail: (email: string | null) => void;
+  setMotivationId: (id: string) => void;
+  setDailyTimeId: (id: string) => void;
   setDailyTimeLabel: (label: string) => void;
 
   // Reset all onboarding data
@@ -14,15 +40,50 @@ type OnboardingStore = {
 };
 
 export const useOnboardingStore = create<OnboardingStore>((set) => ({
+  // Initial state
+  hunterName: '',
+  gender: 'male',
+  age: 24,
+  height: 181,
+  heightUnit: 'cm',
+  weight: 75.0,
+  weightUnit: 'kg',
+  weaknesses: [],
+  rank: null,
+  verifiedEmail: null,
   motivationId: null,
-  setMotivationId: (id) => set({ motivationId: id }),
-
+  dailyTimeId: null,
   dailyTimeLabel: null,
+
+  // Setters
+  setHunterName: (name) => set({ hunterName: name }),
+  setGender: (gender) => set({ gender }),
+  setAge: (age) => set({ age }),
+  setHeight: (height) => set({ height }),
+  setHeightUnit: (heightUnit) => set({ heightUnit }),
+  setWeight: (weight) => set({ weight }),
+  setWeightUnit: (weightUnit) => set({ weightUnit }),
+  setWeaknesses: (weaknesses) => set({ weaknesses }),
+  setRank: (rank) => set({ rank }),
+  setVerifiedEmail: (email) => set({ verifiedEmail: email }),
+  setMotivationId: (id) => set({ motivationId: id }),
+  setDailyTimeId: (id) => set({ dailyTimeId: id }),
   setDailyTimeLabel: (label) => set({ dailyTimeLabel: label }),
 
   resetOnboarding: () =>
     set({
+      hunterName: '',
+      gender: 'male',
+      age: 24,
+      height: 181,
+      heightUnit: 'cm',
+      weight: 75.0,
+      weightUnit: 'kg',
+      weaknesses: [],
+      rank: null,
+      verifiedEmail: null,
       motivationId: null,
+      dailyTimeId: null,
       dailyTimeLabel: null,
     }),
 }));

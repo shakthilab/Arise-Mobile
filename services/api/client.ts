@@ -8,11 +8,13 @@ import { tokenStorage } from './tokenStorage';
 export class ApiError extends Error {
   code: string;
   status?: number;
+  response?: any;
 
-  constructor(code: string, message: string, status?: number) {
+  constructor(code: string, message: string, status?: number, response?: any) {
     super(message);
     this.code = code;
     this.status = status;
+    this.response = response;
   }
 }
 
@@ -20,6 +22,28 @@ export const apiClient = axios.create({
   baseURL: env.apiUrl,
   timeout: 15000,
 });
+
+if (__DEV__) {
+  apiClient.interceptors.request.use((config) => {
+    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL || ''}${config.url}`, config.data || '');
+    return config;
+  });
+
+  apiClient.interceptors.response.use(
+    (response) => {
+      console.log(`[API Response Success] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.status, response.data);
+      return response;
+    },
+    (error) => {
+      console.log(
+        `[API Response Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`,
+        error.response?.status || 'Network/Timeout',
+        error.response?.data || error.message
+      );
+      return Promise.reject(error);
+    }
+  );
+}
 
 apiClient.interceptors.request.use(async (config) => {
   const accessToken = await tokenStorage.getAccessToken();
@@ -42,8 +66,13 @@ async function refreshAccessToken(): Promise<string | null> {
     );
     if (!data.success) return null;
 
-    await tokenStorage.setTokens(data.data.accessToken, data.data.refreshToken);
-    return data.data.accessToken;
+    const accessToken = (data.data as any).access_token || (data.data as any).accessToken;
+    const refToken = (data.data as any).refresh_token || (data.data as any).refreshToken;
+    if (accessToken && refToken) {
+      await tokenStorage.setTokens(accessToken, refToken);
+      return accessToken;
+    }
+    return null;
   } catch {
     await tokenStorage.clearTokens();
     return null;
@@ -70,9 +99,17 @@ apiClient.interceptors.response.use(
     }
 
     const body = error.response?.data;
-    if (body && typeof body === 'object' && body.success === false && body.error) {
-      throw new ApiError(body.error.code, body.error.message, error.response?.status);
+    if (body) {
+      if (typeof body === 'string') {
+        throw new ApiError('api_error', body, error.response?.status, error.response);
+      }
+      if (typeof body === 'object') {
+        const msg = (body as any).message || (body as any).error?.message || (body as any).error;
+        if (msg && typeof msg === 'string') {
+          throw new ApiError((body as any).error?.code || 'api_error', msg, error.response?.status, error.response);
+        }
+      }
     }
-    throw new ApiError('network_error', error.message, error.response?.status);
+    throw new ApiError('network_error', error.message, error.response?.status, error.response);
   }
 );

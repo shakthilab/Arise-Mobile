@@ -23,6 +23,7 @@ import { Screen } from '@/components/common/Screen';
 import { StepIndicator } from '@/components/common/StepIndicator';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useOnboardingStore } from '@/store/useOnboardingStore';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 2; // third step (0-indexed)
@@ -50,11 +51,20 @@ const cmToFtIn = (cm: number) => {
 };
 
 export default function PhysicalProfileScreen() {
-  const [height, setHeight] = useState(181); // stored in CM internally
-  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>('cm');
-  const [weight, setWeight] = useState(75.0); // stored in KG internally
-  const [targetWeight, setTargetWeight] = useState(82.5); // stored in KG internally
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+  const storeHeight = useOnboardingStore((s) => s.height);
+  const storeHeightUnit = useOnboardingStore((s) => s.heightUnit);
+  const storeWeight = useOnboardingStore((s) => s.weight);
+  const storeWeightUnit = useOnboardingStore((s) => s.weightUnit);
+  const setHeightStore = useOnboardingStore((s) => s.setHeight);
+  const setHeightUnitStore = useOnboardingStore((s) => s.setHeightUnit);
+  const setWeightStore = useOnboardingStore((s) => s.setWeight);
+  const setWeightUnitStore = useOnboardingStore((s) => s.setWeightUnit);
+
+  const [height, setHeight] = useState(storeHeight); // stored in CM internally
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>(storeHeightUnit);
+  const [weight, setWeight] = useState(storeWeight); // stored in KG internally
+  const [targetWeight, setTargetWeight] = useState(storeWeight); // stored in KG internally
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>(storeWeightUnit);
   const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const weightRef = useRef(weight);
@@ -68,12 +78,12 @@ export default function PhysicalProfileScreen() {
 
   // Edit Height Modal state
   const [isHeightModalOpen, setIsHeightModalOpen] = useState(false);
-  const [inputHeight, setInputHeight] = useState('181');
+  const [inputHeight, setInputHeight] = useState(storeHeight.toString());
   const [heightError, setHeightError] = useState('');
 
   // Edit Weight Modal state
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
-  const [inputWeight, setInputWeight] = useState('75.0');
+  const [inputWeight, setInputWeight] = useState(storeWeight.toFixed(1));
   const [weightError, setWeightError] = useState('');
 
   const rulerScrollRef = useRef<ScrollView>(null);
@@ -127,12 +137,12 @@ export default function PhysicalProfileScreen() {
       }),
     ]).start();
 
-    // Scroll Height ruler to initial value (181 cm) on mount
+    // Scroll Height ruler to initial value on mount
     setTimeout(() => {
-      const initialX = (181 - MIN_HEIGHT) * TICK_SPACING;
+      const initialX = (storeHeight - MIN_HEIGHT) * TICK_SPACING;
       rulerScrollRef.current?.scrollTo({ x: initialX, animated: false });
     }, 100);
-  }, [headerAnim, heightAnim, weightAnim, buttonAnim]);
+  }, [headerAnim, heightAnim, weightAnim, buttonAnim, storeHeight]);
 
   // PanResponder for Weight Dial Drag Gesture
   const dialPanResponder = useRef(
@@ -188,6 +198,10 @@ export default function PhysicalProfileScreen() {
   });
 
   const handleContinue = () => {
+    setHeightStore(height);
+    setHeightUnitStore(heightUnit);
+    setWeightStore(weight);
+    setWeightUnitStore(weightUnit);
     router.push('/(onboarding)/motivation');
   };
 

@@ -57,7 +57,9 @@ const TIME_OPTIONS: TimeOption[] = [
 ];
 
 export default function TimeScreen() {
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const storeDailyTimeId = useOnboardingStore((s) => s.dailyTimeId);
+    const [selectedId, setSelectedId] = useState<string | null>(storeDailyTimeId);
+    const setDailyTimeId = useOnboardingStore((s) => s.setDailyTimeId);
     const setDailyTimeLabel = useOnboardingStore((s) => s.setDailyTimeLabel);
 
     // Animations
@@ -102,6 +104,7 @@ export default function TimeScreen() {
 
     const handleContinue = () => {
         if (!selectedId) return;
+        setDailyTimeId(selectedId);
         // Save the selected time commitment to store for the oath summary
         const selected = TIME_OPTIONS.find((t) => t.id === selectedId);
         if (selected) {

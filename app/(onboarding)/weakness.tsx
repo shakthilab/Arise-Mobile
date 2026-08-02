@@ -17,6 +17,7 @@ import { Screen } from '@/components/common/Screen';
 import { StepIndicator } from '@/components/common/StepIndicator';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { useOnboardingStore } from '@/store/useOnboardingStore';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 4; // fifth step (0-indexed)
@@ -85,7 +86,9 @@ const WEAKNESSES: WeaknessOption[] = [
 ];
 
 export default function WeaknessScreen() {
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const storeWeaknesses = useOnboardingStore((s) => s.weaknesses);
+    const setWeaknessesStore = useOnboardingStore((s) => s.setWeaknesses);
+    const [selectedIds, setSelectedIds] = useState<string[]>(storeWeaknesses);
 
     // Animations
     const headerAnim = useRef(new Animated.Value(0)).current;
@@ -141,6 +144,7 @@ export default function WeaknessScreen() {
 
     const handleContinue = () => {
         if (selectedIds.length === 0) return;
+        setWeaknessesStore(selectedIds);
         // Navigate to step 4: assessment
         router.push('/(onboarding)/assessment');
     };

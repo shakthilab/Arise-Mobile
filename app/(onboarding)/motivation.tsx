@@ -63,7 +63,8 @@ const MOTIVATIONS: MotivationOption[] = [
 ];
 
 export default function MotivationScreen() {
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const storeMotivationId = useOnboardingStore((s) => s.motivationId);
+    const [selectedId, setSelectedId] = useState<string | null>(storeMotivationId);
     const setMotivationId = useOnboardingStore((s) => s.setMotivationId);
 
     // Animations

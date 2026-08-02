@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -11,10 +11,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { fontFamilies } from '@/theme/typography';
+import { forgotPassword } from '@/services/api/auth.service';
 
 const easeOutCubic = Easing.out(Easing.cubic);
 
@@ -24,22 +25,22 @@ export default function RecoverySentScreen() {
   const iconTopOffset = screenHeight * 0.28;
 
   // ── Animation values ────────────────────────────────────────────────────
-  const bgOpacity   = useRef(new Animated.Value(0)).current;
+  const bgOpacity = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(0)).current;
-  const iconScale   = useRef(new Animated.Value(0.85)).current;
-  const iconY       = useRef(new Animated.Value(12)).current;
-  const headingOp   = useRef(new Animated.Value(0)).current;
-  const headingY    = useRef(new Animated.Value(18)).current;
-  const descOp      = useRef(new Animated.Value(0)).current;
-  const descY       = useRef(new Animated.Value(14)).current;
-  const btnOp       = useRef(new Animated.Value(0)).current;
-  const btnY        = useRef(new Animated.Value(16)).current;
-  const btnScale    = useRef(new Animated.Value(0.98)).current;
-  const secOp       = useRef(new Animated.Value(0)).current;
-  const backOp      = useRef(new Animated.Value(0)).current;
+  const iconScale = useRef(new Animated.Value(0.85)).current;
+  const iconY = useRef(new Animated.Value(12)).current;
+  const headingOp = useRef(new Animated.Value(0)).current;
+  const headingY = useRef(new Animated.Value(18)).current;
+  const descOp = useRef(new Animated.Value(0)).current;
+  const descY = useRef(new Animated.Value(14)).current;
+  const btnOp = useRef(new Animated.Value(0)).current;
+  const btnY = useRef(new Animated.Value(16)).current;
+  const btnScale = useRef(new Animated.Value(0.98)).current;
+  const secOp = useRef(new Animated.Value(0)).current;
+  const backOp = useRef(new Animated.Value(0)).current;
 
   // Press scale refs
-  const primaryPressScale   = useRef(new Animated.Value(1)).current;
+  const primaryPressScale = useRef(new Animated.Value(1)).current;
   const secondaryPressScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -60,21 +61,21 @@ export default function RecoverySentScreen() {
 
     Animated.parallel([
       // Background
-      t(bgOpacity,   1, 500, 0),
-      t(backOp,      1, 400, 0),
+      t(bgOpacity, 1, 500, 0),
+      t(backOp, 1, 400, 0),
       // Icon
       t(iconOpacity, 1, 700, 0),
-      t(iconScale,   1, 700, 0),
-      t(iconY,       0, 700, 0),
+      t(iconScale, 1, 700, 0),
+      t(iconY, 0, 700, 0),
       // Heading
       t(headingOp, 1, 500, 150),
-      t(headingY,  0, 500, 150),
+      t(headingY, 0, 500, 150),
       // Description
       t(descOp, 1, 450, 250),
-      t(descY,  0, 450, 250),
+      t(descY, 0, 450, 250),
       // Primary Button
-      t(btnOp,    1, 450, 350),
-      t(btnY,     0, 450, 350),
+      t(btnOp, 1, 450, 350),
+      t(btnY, 0, 450, 350),
       t(btnScale, 1, 450, 350),
       // Secondary actions
       t(secOp, 1, 350, 450),
@@ -100,7 +101,31 @@ export default function RecoverySentScreen() {
 
   const handleOpenEmail = () => {
     const scheme = Platform.OS === 'ios' ? 'message://' : 'mailto:';
-    Linking.openURL(scheme).catch(() => {});
+    Linking.openURL(scheme).catch(() => { });
+  };
+
+  const { email } = useLocalSearchParams<{ email?: string }>();
+  const [resending, setResending] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleResend = async () => {
+    if (!email) {
+      setFeedback({ type: 'error', text: 'No email address found to resend to.' });
+      return;
+    }
+    setResending(true);
+    setFeedback(null);
+    try {
+      const msg = await forgotPassword(email);
+      setFeedback({ type: 'success', text: msg || 'Recovery link resent successfully!' });
+    } catch (err) {
+      setFeedback({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Resend failed. Please try again.',
+      });
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
@@ -202,11 +227,25 @@ export default function RecoverySentScreen() {
 
             {/* Resend Link */}
             <Pressable
-              onPress={() => router.back()}
-              style={styles.resendBtn}
+              onPress={handleResend}
+              disabled={resending}
+              style={[styles.resendBtn, resending && { opacity: 0.5 }]}
             >
-              <Text style={styles.resendLabel}>RESEND LINK</Text>
+              <Text style={styles.resendLabel}>
+                {resending ? 'RESENDING...' : 'RESEND LINK'}
+              </Text>
             </Pressable>
+
+            {feedback ? (
+              <Text
+                style={[
+                  styles.feedbackText,
+                  feedback.type === 'success' ? styles.successText : styles.errorText,
+                ]}
+              >
+                {feedback.text}
+              </Text>
+            ) : null}
           </Animated.View>
         </View>
       </SafeAreaView>
@@ -335,5 +374,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     color: '#52525B',
     textDecorationLine: 'underline',
+  },
+  feedbackText: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  successText: {
+    color: '#10B981',
+  },
+  errorText: {
+    color: '#EF4444',
   },
 });

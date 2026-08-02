@@ -70,8 +70,8 @@ export default function OathScreen() {
     const handleSwearOath = () => {
         if (!allChecked) return;
 
-        // Navigate to ascension splash before finalizing onboarding
-        router.push('/(onboarding)/ascension');
+        // Navigate to signup screen after swearing the oath
+        router.push('/(auth)/signup');
     };
 
     return (

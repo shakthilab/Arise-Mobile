@@ -12,11 +12,12 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { resetPassword } from '@/services/api/auth.service';
 
 const easeOut = Easing.out(Easing.cubic);
 
@@ -115,6 +116,9 @@ export default function ResetPasswordScreen() {
   const [showConfirm,     setShowConfirm]     = useState(false);
   const [focusedField,    setFocusedField]    = useState<'new' | 'confirm' | null>(null);
   const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState<string | null>(null);
+
+  const { token } = useLocalSearchParams<{ token: string }>();
 
   // Animation values
   const bgOp       = useRef(new Animated.Value(0)).current;
@@ -162,13 +166,18 @@ export default function ResetPasswordScreen() {
   const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
   const canSubmit    = allMet && passwordsMatch;
 
-  const handleSetPassword = () => {
+  const handleSetPassword = async () => {
     if (!canSubmit) return;
+    setError(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await resetPassword(token || '', newPassword, confirmPassword);
       router.replace('/(auth)/login');
-    }, 1400);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onPressIn = () =>
@@ -312,6 +321,14 @@ export default function ResetPasswordScreen() {
                 <Requirement key={r.key} label={r.label} met={r.met} />
               ))}
             </Animated.View>
+
+            {/* ── Error Banner ─────────────────────────────────────────── */}
+            {error ? (
+              <View style={styles.errorBanner}>
+                <Feather name="alert-circle" size={14} color="#EF4444" style={{ marginRight: 8 }} />
+                <Text style={styles.bannerErrorText}>{error}</Text>
+              </View>
+            ) : null}
 
             {/* ── Submit Button ────────────────────────────────────────── */}
             <Animated.View
@@ -488,5 +505,22 @@ const styles = StyleSheet.create({
   },
   submitLabelDisabled: {
     color: '#3A3A3E',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  bannerErrorText: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 13,
+    color: '#EF4444',
+    flex: 1,
   },
 });

@@ -8,7 +8,7 @@ type AuthState = {
   isAuthenticating: boolean;
   isOnboarded: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, displayName: string) => Promise<void>;
+  signup: (payload: authService.RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
   completeOnboarding: () => void;
@@ -29,10 +29,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  signup: async (email, password, displayName) => {
+  signup: async (payload) => {
     set({ isAuthenticating: true });
     try {
-      const user = await authService.signup(email, password, displayName);
+      const user = await authService.signup(payload);
       set({ user, isOnboarded: false });
     } finally {
       set({ isAuthenticating: false });
