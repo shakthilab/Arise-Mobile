@@ -11,8 +11,8 @@ import * as SecureStore from 'expo-secure-store';
  * exists in a browser anyway, so this isn't a security downgrade so much
  * as matching what the platform can actually provide.
  */
-const ACCESS_TOKEN_KEY = 'arise.accessToken';
-const REFRESH_TOKEN_KEY = 'arise.refreshToken';
+const ACCESS_TOKEN_KEY = 'hunterx.accessToken';
+const REFRESH_TOKEN_KEY = 'hunterx.refreshToken';
 
 const webStorage = {
   async getItem(key: string) {

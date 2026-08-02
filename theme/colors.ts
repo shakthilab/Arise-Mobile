@@ -17,6 +17,12 @@ export const palette = {
   goldMuted: '#C5A059',
   red: '#FF4D6D',
   green: '#3DDC97',
+
+  // Profile screen accents
+  electricBlue: '#00F0FF',
+  neonGreen: '#39FF14',
+  cyberGold: '#FFD700',
+  flameOrange: '#FF5500',
 } as const;
 
 export const colors = {
@@ -24,6 +30,11 @@ export const colors = {
   surface: palette.navy800,
   surfaceElevated: palette.navy700,
   border: palette.navy600,
+
+  // Glass surfaces for profile cards
+  glass: 'rgba(255, 255, 255, 0.05)',
+  glassBorder: 'rgba(255, 255, 255, 0.10)',
+  glassElevated: 'rgba(255, 255, 255, 0.08)',
 
   textPrimary: palette.white,
   textSecondary: palette.slate300,
@@ -33,6 +44,10 @@ export const colors = {
   accentSecondary: palette.purple,
   accentGold: palette.gold,
   accentGoldMuted: palette.goldMuted,
+  accentBlue: palette.electricBlue,
+  accentGreen: palette.neonGreen,
+  accentCyberGold: palette.cyberGold,
+  accentOrange: palette.flameOrange,
 
   success: palette.green,
   danger: palette.red,

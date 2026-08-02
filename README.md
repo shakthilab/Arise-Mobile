@@ -1,6 +1,6 @@
-# 🌅 Arise Mobile
+# 🌅 HunterX Mobile
 
-> **Arise** is a gamified habit and discipline app inspired by the progression system of **Solo Leveling**. Complete daily missions, earn XP, build streaks, level up, and transform consistency into a rewarding game.
+> **HunterX** is a gamified habit and discipline app inspired by the progression system of **Solo Leveling**. Complete daily missions, earn XP, build streaks, level up, and transform consistency into a rewarding game.
 
 Built with **React Native** and **Expo** for both **iOS** and **Android**.
 
@@ -8,7 +8,7 @@ Built with **React Native** and **Expo** for both **iOS** and **Android**.
 
 ## 📱 Overview
 
-Arise is designed to help users develop lasting habits through an engaging RPG-style experience. Instead of traditional to-do lists, users complete daily quests, gain experience, unlock achievements, maintain streaks, and earn rewards that keep them motivated every day.
+HunterX is designed to help users develop lasting habits through an engaging RPG-style experience. Instead of traditional to-do lists, users complete daily quests, gain experience, unlock achievements, maintain streaks, and earn rewards that keep them motivated every day.
 
 ---
 
@@ -68,7 +68,7 @@ Arise is designed to help users develop lasting habits through an engaging RPG-s
 ## 📂 Project Structure
 
 ```text
-arise-mobile/
+hunterx-mobile/
 │
 ├── app/                # Expo Router screens
 │   ├── (auth)/
@@ -101,9 +101,9 @@ arise-mobile/
 ### Installation
 
 ```bash
-git clone https://github.com/<your-org>/arise-mobile.git
+git clone https://github.com/<your-org>/hunterx-mobile.git
 
-cd arise-mobile
+cd hunterx-mobile
 
 npm install
 ```
@@ -148,7 +148,7 @@ Web
 
 ## 📦 Backend
 
-This application communicates with the **Arise Backend API** for:
+This application communicates with the **HunterX Backend API** for:
 
 - Authentication
 - Habit management
@@ -164,8 +164,8 @@ This application communicates with the **Arise Backend API** for:
 
 | Repository | Description |
 |------------|-------------|
-| **arise-backend** | Node.js + Express API |
-| **arise-admin** | Next.js Admin Dashboard |
+| **hunterx-backend** | Node.js + Express API |
+| **hunterx-admin** | Next.js Admin Dashboard |
 
 ---
 
@@ -182,12 +182,8 @@ This application communicates with the **Arise Backend API** for:
 
 ## 🎯 Vision
 
-Arise transforms daily discipline into an immersive RPG experience. Every completed habit earns progress, every streak builds momentum, and every level represents real personal growth.
+HunterX transforms daily discipline into an immersive RPG experience. Every completed habit earns progress, every streak builds momentum, and every level represents real personal growth.
 
 > **Discipline isn't built overnight. It levels up one day at a time.**
 
 ---
-
-## 📄 License
-
-This project is private and proprietary. Unauthorized copying, distribution, or modification is prohibited.

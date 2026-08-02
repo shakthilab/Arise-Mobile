@@ -108,7 +108,7 @@ export default function OathScreen() {
                         <Text style={styles.quoteText}>
                             "I will not quit when it is hard.{'\n\n'}
                             I will not rest when it is easy.{'\n\n'}
-                            I will <Text style={styles.quoteGold}>arise</Text> — every single day —{'\n'}
+                            I will <Text style={styles.quoteGold}>HunterX</Text> — every single day —{'\n'}
                             until <Text style={styles.quoteBold}>the hunter becomes the{'\n'}legend.</Text>"
                         </Text>
                     </View>
@@ -198,7 +198,7 @@ export default function OathScreen() {
                     labelStyle={styles.ctaLabel}
                 />
                 <Text style={styles.footerText}>
-                    By continuing you agree to Arise's Terms & Privacy Policy
+                    By continuing you agree to HunterX's Terms & Privacy Policy
                 </Text>
             </Animated.View>
         </Screen>

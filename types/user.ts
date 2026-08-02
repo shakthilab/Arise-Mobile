@@ -2,7 +2,7 @@ export type User = {
   id: string;
   displayName: string;
   email: string;
-  avatarUrl: string | null;
+  avatarUrl: string | number | null | any;
   level: number;
   xp: number;
   currentStreak: number;
