@@ -25,7 +25,8 @@ const CURRENT_STEP = 7; // eighth step (0-indexed)
 
 export default function OathScreen() {
     const { completeOnboarding } = useAuth();
-    const motivationId = useOnboardingStore((s) => s.motivationId);
+    const motivationIds = useOnboardingStore((s) => s.motivationIds) || [];
+    const rank = useOnboardingStore((s) => s.rank);
     const dailyTimeLabel = useOnboardingStore((s) => s.dailyTimeLabel);
 
     const [checked1, setChecked1] = useState(false);
@@ -147,28 +148,33 @@ export default function OathScreen() {
                     <View style={styles.summaryContainer}>
                         <View style={styles.summaryBox}>
                             <Text style={styles.summaryLabel}>HUNTER</Text>
-                            {motivationId === 'discipline' && (
-                                <MaterialCommunityIcons name="sword-cross" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />
-                            )}
-                            {motivationId === 'physical' && (
-                                <MaterialCommunityIcons name="arm-flex" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />
-                            )}
-                            {motivationId === 'focus' && (
-                                <Ionicons name="settings-sharp" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />
-                            )}
-                            {motivationId === 'legacy' && (
-                                <MaterialCommunityIcons name="crown" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />
-                            )}
-                            {motivationId === 'prove' && (
-                                <Feather name="circle" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />
-                            )}
-                            {!motivationId && (
-                                <MaterialCommunityIcons name="crown" size={16} color="#FFFFFF" style={{ marginTop: 2 }} />
-                            )}
+                            <View style={{ flexDirection: 'row', gap: 6, marginTop: 2, alignItems: 'center' }}>
+                                {motivationIds.includes('discipline') && (
+                                    <MaterialCommunityIcons name="sword-cross" size={18} color="#FFFFFF" />
+                                )}
+                                {motivationIds.includes('physical') && (
+                                    <MaterialCommunityIcons name="arm-flex" size={18} color="#FFFFFF" />
+                                )}
+                                {motivationIds.includes('focus') && (
+                                    <Ionicons name="settings-sharp" size={18} color="#FFFFFF" />
+                                )}
+                                {motivationIds.includes('legacy') && (
+                                    <MaterialCommunityIcons name="crown" size={18} color="#FFFFFF" />
+                                )}
+                                {motivationIds.includes('prove') && (
+                                    <Feather name="circle" size={18} color="#FFFFFF" />
+                                )}
+                                {motivationIds.length === 0 && (
+                                    <MaterialCommunityIcons name="crown" size={16} color="#FFFFFF" />
+                                )}
+                            </View>
                         </View>
                         <View style={styles.summaryBox}>
                             <Text style={styles.summaryLabel}>RANK</Text>
-                            <Text style={styles.summaryValue}>E</Text>
+                            {rank === 'beginner' && <MaterialCommunityIcons name="shield-outline" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />}
+                            {rank === 'intermediate' && <MaterialCommunityIcons name="shield-half-full" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />}
+                            {rank === 'advanced' && <MaterialCommunityIcons name="shield-crown" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />}
+                            {!rank && <MaterialCommunityIcons name="shield-outline" size={18} color="#FFFFFF" style={{ marginTop: 2 }} />}
                         </View>
                         <View style={styles.summaryBox}>
                             <Text style={styles.summaryLabel}>DAILY</Text>
@@ -198,7 +204,7 @@ export default function OathScreen() {
                     labelStyle={styles.ctaLabel}
                 />
                 <Text style={styles.footerText}>
-                    By continuing you agree to Arise's Terms & Privacy Policy
+                    By continuing you agree to HunterX's Terms & Privacy Policy
                 </Text>
             </Animated.View>
         </Screen>

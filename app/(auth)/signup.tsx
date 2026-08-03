@@ -236,9 +236,9 @@ export default function SignupScreen() {
         { questionId: 3, answer: (storeState.age || 24).toString() },
         { questionId: 4, answer: formattedHeight },
         { questionId: 5, answer: formattedWeight },
-        { questionId: 6, answer: storeState.motivationId || 'discipline' },
+        { questionId: 6, answer: storeState.motivationIds && storeState.motivationIds.length > 0 ? storeState.motivationIds.join(',') : 'discipline' },
         { questionId: 7, answer: storeState.weaknesses.length > 0 ? storeState.weaknesses.join(',') : 'none' },
-        { questionId: 8, answer: storeState.rank || 'c_rank' },
+        { questionId: 8, answer: storeState.rank || 'beginner' },
         { questionId: 9, answer: storeState.dailyTimeLabel || '30min' },
         { questionId: 10, answer: 'accepted' },
       ],
@@ -291,10 +291,7 @@ export default function SignupScreen() {
           />
 
           {isEmailVerified ? (
-            <View style={styles.verifiedBadge}>
-              <Feather name="check-circle" size={14} color="#10B981" />
-              <Text style={styles.verifiedBadgeText}>VERIFIED</Text>
-            </View>
+            <Feather name="check-circle" size={20} color="#71717A" />
           ) : (
             <Pressable
               onPress={handleSendEmailOtp}
@@ -462,28 +459,32 @@ export default function SignupScreen() {
               <Text style={styles.modalEmailHighlight}>{email}</Text>. Enter it below to verify.
             </Text>
 
-            {/* Hidden TextInput for OTP */}
-            <TextInput
-              ref={otpInputRef}
-              style={styles.hiddenInput}
-              value={otpCode}
-              onChangeText={(txt) => {
-                const clean = txt.replace(/[^0-9]/g, '');
-                setOtpCode(clean);
-                if (clean.length === 6) {
-                  Keyboard.dismiss();
-                }
-              }}
-              onFocus={() => setIsOtpSlotFocused(true)}
-              onBlur={() => setIsOtpSlotFocused(false)}
-              keyboardType="number-pad"
-              maxLength={6}
-              textContentType="oneTimeCode"
-              autoComplete="one-time-code"
-            />
+            {/* Overlay Input Container */}
+            <View style={styles.modalOtpInputContainer}>
+              {/* OTP Slots Row */}
+              <View style={styles.modalSlotsRow}>{renderOtpSlots()}</View>
 
-            {/* OTP Slots Row */}
-            <View style={styles.modalSlotsRow}>{renderOtpSlots()}</View>
+              {/* Stretched Input field covering the slots */}
+              <TextInput
+                ref={otpInputRef}
+                style={styles.modalOverlayInput}
+                value={otpCode}
+                onChangeText={(txt) => {
+                  const clean = txt.replace(/[^0-9]/g, '');
+                  setOtpCode(clean);
+                  if (clean.length === 6) {
+                    Keyboard.dismiss();
+                  }
+                }}
+                onFocus={() => setIsOtpSlotFocused(true)}
+                onBlur={() => setIsOtpSlotFocused(false)}
+                keyboardType="number-pad"
+                maxLength={6}
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
+                selectionColor="transparent"
+              />
+            </View>
 
 
 
@@ -693,6 +694,20 @@ const styles = StyleSheet.create({
     opacity: 0,
     width: 0,
     height: 0,
+  },
+  modalOtpInputContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  modalOverlayInput: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
+    width: '100%',
+    height: '100%',
   },
   modalBackdrop: {
     flex: 1,

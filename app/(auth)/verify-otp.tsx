@@ -198,22 +198,26 @@ export default function VerifyOtpScreen() {
               <Text style={styles.emailHighlight}>{email || 'your email'}</Text>. Enter it below to unlock the oath gate.
             </Text>
 
-            {/* Hidden Input field */}
-            <TextInput
-              ref={inputRef}
-              style={styles.hiddenInput}
-              value={code}
-              onChangeText={handleCodeChange}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              keyboardType="number-pad"
-              maxLength={OTP_LENGTH}
-              textContentType="oneTimeCode"
-              autoComplete="one-time-code"
-            />
+            {/* Overlay Input Container */}
+            <View style={styles.otpInputContainer}>
+              {/* Styled Pin Slot Row */}
+              <View style={styles.slotsRow}>{renderSlots()}</View>
 
-            {/* Styled Pin Slot Row */}
-            <View style={styles.slotsRow}>{renderSlots()}</View>
+              {/* Stretched Input field covering the slots */}
+              <TextInput
+                ref={inputRef}
+                style={styles.overlayInput}
+                value={code}
+                onChangeText={handleCodeChange}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                keyboardType="number-pad"
+                maxLength={OTP_LENGTH}
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
+                selectionColor="transparent"
+              />
+            </View>
 
             {/* Error Message */}
             {error && (
@@ -326,6 +330,20 @@ const styles = StyleSheet.create({
     opacity: 0,
     width: 0,
     height: 0,
+  },
+  otpInputContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  overlayInput: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
+    width: '100%',
+    height: '100%',
   },
   slotsRow: {
     flexDirection: 'row',

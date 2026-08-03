@@ -187,7 +187,7 @@ export default function ForgotPasswordScreen() {
               <Text style={styles.tagText}>LOST ACCESS</Text>
               <Text style={styles.titleText}>Recover your account</Text>
               <Text style={styles.subtitleText}>
-                Enter the email linked to your Arise account and we will send you a recovery link
+                Enter the email linked to your HunterX account and we will send you a recovery link
               </Text>
             </Animated.View>
 

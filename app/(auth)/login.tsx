@@ -127,7 +127,7 @@ export default function LoginScreen() {
             />
 
             <Animated.View style={[styles.heroTextContainer, createAnimatedStyle(heroAnim)]}>
-              <Text style={styles.title}>ARISE</Text>
+              <Text style={styles.title}>HUNTERX</Text>
               <Text style={styles.subtitle}>T H E   S Y S T E M   H A S   C H O S E N   Y O U</Text>
             </Animated.View>
           </ImageBackground>

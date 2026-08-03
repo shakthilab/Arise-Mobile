@@ -10,7 +10,7 @@ import {
     Text,
     View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Button } from '@/components/common/Button';
 import { Screen } from '@/components/common/Screen';
@@ -25,7 +25,7 @@ const CURRENT_STEP = 5; // sixth step (0-indexed)
 type RankOption = {
     id: string;
     rankIndex: number;
-    letter: string;
+    icon: (color: string) => React.ReactNode;
     titlePrefix: string;
     titleSuffix: string;
     subtitle: string;
@@ -34,48 +34,30 @@ type RankOption = {
 
 const RANKS: RankOption[] = [
     {
-        id: 'e_rank',
+        id: 'beginner',
         rankIndex: 0,
-        letter: 'E',
-        titlePrefix: 'E-Rank',
-        titleSuffix: ' — Just awakened',
-        subtitle: 'No habits. Starting from zero. First gate.',
+        icon: (color) => <MaterialCommunityIcons name="shield-outline" size={20} color={color} />,
+        titlePrefix: 'Beginner',
+        titleSuffix: ' — Just starting out',
+        subtitle: 'No habits. Starting from scratch.',
         bars: 1,
     },
     {
-        id: 'd_rank',
+        id: 'intermediate',
         rankIndex: 1,
-        letter: 'D',
-        titlePrefix: 'D-Rank',
-        titleSuffix: ' — Tried before',
-        subtitle: 'Some attempts. Broke a few streaks. Learning.',
-        bars: 2,
-    },
-    {
-        id: 'c_rank',
-        rankIndex: 2,
-        letter: 'C',
-        titlePrefix: 'C-Rank',
-        titleSuffix: ' — Some habits formed',
-        subtitle: 'Inconsistent but improving. Breaking patterns.',
+        icon: (color) => <MaterialCommunityIcons name="shield-half-full" size={20} color={color} />,
+        titlePrefix: 'Intermediate',
+        titleSuffix: ' — Some experience',
+        subtitle: 'Tried forming habits. Inconsistent but improving.',
         bars: 3,
     },
     {
-        id: 'b_rank',
-        rankIndex: 3,
-        letter: 'B',
-        titlePrefix: 'B-Rank',
-        titleSuffix: ' — Solid foundation',
-        subtitle: 'Consistent in most areas. Seeking elite-level.',
-        bars: 4,
-    },
-    {
-        id: 'a_rank',
-        rankIndex: 4,
-        letter: 'A',
-        titlePrefix: 'A-Rank',
+        id: 'advanced',
+        rankIndex: 2,
+        icon: (color) => <MaterialCommunityIcons name="shield-crown" size={20} color={color} />,
+        titlePrefix: 'Advanced',
         titleSuffix: ' — High performer',
-        subtitle: 'Systems in place. Optimising for mastery.',
+        subtitle: 'Solid foundations. Systems in place. Optimizing for mastery.',
         bars: 5,
     },
 ];
@@ -190,9 +172,7 @@ export default function AssessmentScreen() {
                             >
                                 {/* Rank Box (Left) */}
                                 <View style={[styles.rankLetterBox, isSelected && styles.rankLetterBoxSelected]}>
-                                    <Text style={[styles.rankLetterText, isSelected && styles.rankLetterTextSelected]}>
-                                        {option.letter}
-                                    </Text>
+                                    {option.icon(isSelected ? colors.accentGold : '#A1A1AA')}
                                 </View>
 
                                 {/* Content (Middle) */}

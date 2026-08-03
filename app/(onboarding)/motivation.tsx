@@ -63,9 +63,9 @@ const MOTIVATIONS: MotivationOption[] = [
 ];
 
 export default function MotivationScreen() {
-    const storeMotivationId = useOnboardingStore((s) => s.motivationId);
-    const [selectedId, setSelectedId] = useState<string | null>(storeMotivationId);
-    const setMotivationId = useOnboardingStore((s) => s.setMotivationId);
+    const storeMotivationIds = useOnboardingStore((s) => s.motivationIds);
+    const [selectedIds, setSelectedIds] = useState<string[]>(storeMotivationIds || []);
+    const setMotivationIds = useOnboardingStore((s) => s.setMotivationIds);
 
     // Animations
     const headerAnim = useRef(new Animated.Value(0)).current;
@@ -107,10 +107,18 @@ export default function MotivationScreen() {
         ],
     });
 
+    const toggleSelection = (id: string) => {
+        if (selectedIds.includes(id)) {
+            setSelectedIds(selectedIds.filter((item) => item !== id));
+        } else {
+            setSelectedIds([...selectedIds, id]);
+        }
+    };
+
     const handleContinue = () => {
-        if (!selectedId) return;
-        // Save the selected motivation ID to store for the oath summary icon
-        setMotivationId(selectedId);
+        if (selectedIds.length === 0) return;
+        // Save the selected motivation IDs to store for the oath summary icon
+        setMotivationIds(selectedIds);
         // Navigate to step 3: weakness
         router.push('/(onboarding)/weakness');
     };
@@ -155,7 +163,7 @@ export default function MotivationScreen() {
                     <Text style={styles.sectionLabel}>CORE DRIVE</Text>
                     <Text style={styles.title}>Why do you want to{'\n'}level up?</Text>
                     <Text style={styles.description}>
-                        The system needs to understand your primary motivation. Choose the one that resonates
+                        The system needs to understand your primary motivation. Choose all that resonate
                         deepest.
                     </Text>
                 </Animated.View>
@@ -163,11 +171,11 @@ export default function MotivationScreen() {
                 {/* Options List */}
                 <Animated.View style={[styles.optionsList, fadeSlideStyle(listAnim)]}>
                     {MOTIVATIONS.map((option, index) => {
-                        const isSelected = selectedId === option.id;
+                        const isSelected = selectedIds.includes(option.id);
                         return (
                             <View key={option.id}>
                                 <Pressable
-                                    onPress={() => setSelectedId(option.id)}
+                                    onPress={() => toggleSelection(option.id)}
                                     style={[
                                         styles.optionRow,
                                         isSelected && styles.optionRowSelected,
@@ -188,15 +196,15 @@ export default function MotivationScreen() {
                                         </Text>
                                     </View>
 
-                                    {/* Radio indicator */}
+                                    {/* Checkbox indicator */}
                                     <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>
-                                        {isSelected && <View style={styles.radioInner} />}
+                                        {isSelected && <Feather name="check" size={12} color={colors.accentGold} />}
                                     </View>
                                 </Pressable>
 
                                 {/* Separator (not after last item) */}
                                 {index < MOTIVATIONS.length - 1 && !isSelected && (
-                                    selectedId !== MOTIVATIONS[index + 1]?.id ? (
+                                    !selectedIds.includes(MOTIVATIONS[index + 1]?.id) ? (
                                         <View style={styles.separator} />
                                     ) : null
                                 )}
@@ -212,7 +220,7 @@ export default function MotivationScreen() {
                     label="CONTINUE"
                     onPress={handleContinue}
                     variant="primary"
-                    disabled={!selectedId}
+                    disabled={selectedIds.length === 0}
                     style={styles.ctaButton}
                     labelStyle={styles.ctaLabel}
                 />

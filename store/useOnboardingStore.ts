@@ -14,7 +14,7 @@ type OnboardingStore = {
   verifiedEmail: string | null;
 
   // Motivation screen selection ("What do you want to level up?")
-  motivationId: string | null;
+  motivationIds: string[];
 
   // Time screen selection ("Commit daily")
   dailyTimeId: string | null;
@@ -31,7 +31,7 @@ type OnboardingStore = {
   setWeaknesses: (weaknesses: string[]) => void;
   setRank: (rank: string) => void;
   setVerifiedEmail: (email: string | null) => void;
-  setMotivationId: (id: string) => void;
+  setMotivationIds: (ids: string[]) => void;
   setDailyTimeId: (id: string) => void;
   setDailyTimeLabel: (label: string) => void;
 
@@ -51,7 +51,7 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
   weaknesses: [],
   rank: null,
   verifiedEmail: null,
-  motivationId: null,
+  motivationIds: [],
   dailyTimeId: null,
   dailyTimeLabel: null,
 
@@ -66,7 +66,7 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
   setWeaknesses: (weaknesses) => set({ weaknesses }),
   setRank: (rank) => set({ rank }),
   setVerifiedEmail: (email) => set({ verifiedEmail: email }),
-  setMotivationId: (id) => set({ motivationId: id }),
+  setMotivationIds: (ids) => set({ motivationIds: ids }),
   setDailyTimeId: (id) => set({ dailyTimeId: id }),
   setDailyTimeLabel: (label) => set({ dailyTimeLabel: label }),
 
@@ -82,7 +82,7 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
       weaknesses: [],
       rank: null,
       verifiedEmail: null,
-      motivationId: null,
+      motivationIds: [],
       dailyTimeId: null,
       dailyTimeLabel: null,
     }),
