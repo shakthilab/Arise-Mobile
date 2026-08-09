@@ -1,52 +1,54 @@
-import { FlatList, StyleSheet, Text } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/common/Screen';
-import { Card } from '@/components/ui/Card';
-import { ACHIEVEMENT_DEFINITIONS } from '@/constants/achievements';
-import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
-import { typography } from '@/theme/typography';
+import { fontFamilies } from '@/theme/typography';
 
 export default function AchievementsScreen() {
   return (
     <Screen style={styles.container}>
-      <Text style={styles.title}>Achievements</Text>
-      <FlatList
-        data={ACHIEVEMENT_DEFINITIONS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <Card style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardDescription}>{item.description}</Text>
-          </Card>
-        )}
-      />
+      {/* Top Header Title */}
+      <Text style={styles.headerTitle}>Metrics</Text>
+
+      {/* Centered Empty State */}
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyTitle}>Metrics is empty</Text>
+        <Text style={styles.emptySubtitle}>Complete missions to track your metrics.</Text>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: spacing.lg,
-    gap: spacing.md,
+    flex: 1,
+    backgroundColor: '#09090B',
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
-  title: {
-    ...typography.title,
-    color: colors.textPrimary,
+  headerTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 24,
+    color: '#FFFFFF',
+    marginBottom: 20,
   },
-  list: {
-    gap: spacing.sm,
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 80,
+    gap: 8,
   },
-  card: {
-    gap: spacing.xxs,
+  emptyTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 18,
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
-  cardTitle: {
-    ...typography.subtitle,
-    color: colors.textPrimary,
-  },
-  cardDescription: {
-    ...typography.caption,
-    color: colors.textSecondary,
+  emptySubtitle: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 14,
+    color: '#A1A1AA',
+    textAlign: 'center',
   },
 });
