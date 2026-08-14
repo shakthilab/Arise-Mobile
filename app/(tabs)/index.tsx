@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Animated,
   Image,
@@ -15,8 +15,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { Screen } from '@/components/common/Screen';
 import { ExactMedalIcon } from '@/components/common/ExactMedalIcon';
+import { DayCompleteScreen } from '@/components/features/missions/DayCompleteScreen';
 import { LootDropModal } from '@/components/features/loot/LootDropModal';
 import { QuestActionModal } from '@/components/features/missions/QuestActionModal';
+import { TaskCompletedToast } from '@/components/features/missions/TaskCompletedToast';
+import { TaskCompletionScreen } from '@/components/features/missions/TaskCompletionScreen';
 import { WeeklyTracker } from '@/components/features/streaks/WeeklyTracker';
 import { useAuth } from '@/hooks/useAuth';
 import { useLootDrop } from '@/hooks/useLootDrop';
@@ -44,7 +47,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     id: '1',
     title: 'Sleep 8 Hours',
     category: 'REST',
-    xpReward: 50,
+    xpReward: 10,
     type: 'daily',
     showTickButton: true,
     showWrongButton: true,
@@ -57,11 +60,11 @@ const INITIAL_QUESTS: QuestItem[] = [
     id: '2',
     title: 'Drink 3L Water',
     category: 'HYDRATE',
-    xpReward: 50,
+    xpReward: 10,
     type: 'daily',
     showTickButton: true,
     showWrongButton: true,
-    hasStatusPopup: true,
+    hasStatusPopup: false,
     image: require('@/assets/images/threelitterwater.jpeg'),
     status: 'todo',
   },
@@ -69,11 +72,11 @@ const INITIAL_QUESTS: QuestItem[] = [
     id: '3',
     title: 'Protein Goal',
     category: 'NUTRITION',
-    xpReward: 50,
+    xpReward: 10,
     type: 'daily',
     showTickButton: true,
     showWrongButton: true,
-    hasStatusPopup: true,
+    hasStatusPopup: false,
     targetValue: '128 g',
     image: require('@/assets/images/nutrition.jpeg'),
     imageStyle: { height: 170, top: -25 },
@@ -83,8 +86,8 @@ const INITIAL_QUESTS: QuestItem[] = [
     id: '4',
     title: 'Run 10km',
     category: 'CARDIO',
-    xpReward: 50,
-    type: 'weekly',
+    xpReward: 10,
+    type: 'daily',
     showTickButton: true,
     showWrongButton: true,
     hasStatusPopup: false,
@@ -185,6 +188,10 @@ export default function MissionsHomeScreen() {
   const [quests, setQuests] = useState<QuestItem[]>(INITIAL_QUESTS);
   const [selectedQuest, setSelectedQuest] = useState<QuestItem | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [completionScreenVisible, setCompletionScreenVisible] = useState(false);
+  const [completedToastVisible, setCompletedToastVisible] = useState(false);
+  const [dayCompleteModalVisible, setDayCompleteModalVisible] = useState(false);
+  const [toastXp, setToastXp] = useState(10);
 
   const displayName = user?.displayName ? user.displayName.toUpperCase() : 'SEYMEN';
   const displayXP = (user?.xp ?? 1240).toLocaleString();
@@ -198,18 +205,25 @@ export default function MissionsHomeScreen() {
   const dailyTodoQuests = todoQuests.filter((q) => q.type === 'daily');
   const weeklyTodoQuests = todoQuests.filter((q) => q.type === 'weekly');
 
+  // Automatically pop up DayCompleteScreen celebration when all tasks are completed
+  useEffect(() => {
+    if (todoQuests.length === 0 && quests.length > 0) {
+      const timer = setTimeout(() => {
+        setDayCompleteModalVisible(true);
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [todoQuests.length, quests.length]);
+
   const handleOpenQuestActions = (quest: QuestItem) => {
     if (quest.showTickButton === false) return;
-    if (quest.hasStatusPopup === false) {
-      setQuests((prev) =>
-        prev.map((q) =>
-          q.id === quest.id ? { ...q, status: 'done', earnedXp: quest.xpReward } : q
-        )
-      );
-      return;
-    }
-    setSelectedQuest(quest);
-    setActionModalVisible(true);
+    setQuests((prev) =>
+      prev.map((q) =>
+        q.id === quest.id ? { ...q, status: 'done', earnedXp: quest.xpReward } : q
+      )
+    );
+    setToastXp(quest.xpReward);
+    setCompletedToastVisible(true);
   };
 
   const handleFullComplete = () => {
@@ -220,7 +234,9 @@ export default function MissionsHomeScreen() {
         q.id === qId ? { ...q, status: 'done', earnedXp: q.xpReward } : q
       )
     );
-    setActionModalVisible(false);
+    setCompletionScreenVisible(false);
+    setToastXp(selectedQuest.xpReward);
+    setCompletedToastVisible(true);
   };
 
   const handlePartialComplete = () => {
@@ -232,7 +248,9 @@ export default function MissionsHomeScreen() {
         q.id === qId ? { ...q, status: 'partial', earnedXp: partialXp } : q
       )
     );
-    setActionModalVisible(false);
+    setCompletionScreenVisible(false);
+    setToastXp(partialXp);
+    setCompletedToastVisible(true);
   };
 
   const handleSkip = () => {
@@ -261,6 +279,21 @@ export default function MissionsHomeScreen() {
       )
     );
   };
+
+  if (activeTab === 'todo' && todoQuests.length === 0) {
+    return (
+      <Screen style={{ backgroundColor: '#0A0A0A', flex: 1 }}>
+        <DayCompleteScreen
+          quests={quests}
+          onContinue={() => {
+            setQuests((prev) =>
+              prev.map((q) => ({ ...q, status: 'todo', earnedXp: undefined }))
+            );
+          }}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen style={styles.screen}>
@@ -297,7 +330,7 @@ export default function MissionsHomeScreen() {
         </View>
 
         {/* WEEKLY TRACKER (2ND ITEM) */}
-        <WeeklyTracker streakDays={displayStreak} completedDaysCount={4} />
+        <WeeklyTracker streakDays={displayStreak} completedDaysCount={5} />
 
         {/* ACTIVE CAMPAIGN SECTION */}
         <View style={styles.sectionHeaderRow}>
@@ -440,12 +473,23 @@ export default function MissionsHomeScreen() {
         {activeTab === 'todo' && (
           <>
             {todoQuests.length === 0 ? (
-              <View style={styles.emptyStateCard}>
-                <Ionicons name="checkmark-done-circle-outline" size={54} color="#22C55E" />
-                <Text style={styles.emptyStateTitle}>All Quests Settled!</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Great job! You have completed or skipped all active quests.
-                </Text>
+              <View style={styles.peakReachedCard}>
+                <View style={styles.peakReachedLeftCol}>
+                  <Text style={styles.peakReachedSubtag}>— PEAK REACHED —</Text>
+                  <Text style={styles.peakReachedTitle}>Nothing left on the list today.</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.peakShareBtn}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setDayCompleteModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.peakShareBtnText}>SHARE</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#0A0A0A" />
+                </TouchableOpacity>
               </View>
             ) : (
               <>
@@ -685,11 +729,72 @@ export default function MissionsHomeScreen() {
 
       {/* Loot Drop Modal */}
       <LootDropModal visible={dropVisible} rarity={lastDrop} onDismiss={() => setDropVisible(false)} />
+
+      {/* Task Completed Toast Popup */}
+      <TaskCompletedToast
+        visible={completedToastVisible}
+        xp={toastXp}
+        onDismiss={() => setCompletedToastVisible(false)}
+      />
+
+      {/* Day Complete Modal Popup */}
+      {dayCompleteModalVisible && (
+        <DayCompleteScreen
+          quests={quests}
+          onContinue={() => setDayCompleteModalVisible(false)}
+        />
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  /* Peak Reached Completion Banner */
+  peakReachedCard: {
+    backgroundColor: '#18181B',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  peakReachedLeftCol: {
+    flex: 1,
+    marginRight: 16,
+  },
+  peakReachedSubtag: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 12,
+    color: '#FF6A00',
+    letterSpacing: 1.5,
+  },
+  peakReachedTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 20,
+    color: '#FFFFFF',
+    marginTop: 4,
+  },
+  peakShareBtn: {
+    backgroundColor: '#FAF8F5',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  peakShareBtnText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 13,
+    color: '#0A0A0A',
+    letterSpacing: 1,
+  },
   screen: {
     backgroundColor: '#09090B',
   },

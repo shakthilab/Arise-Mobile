@@ -17,5 +17,5 @@ export const env = {
     'EXPO_PUBLIC_SUPABASE_ANON_KEY',
     process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
   ),
-  apiUrl: requireEnv('EXPO_PUBLIC_API_URL', process.env.EXPO_PUBLIC_API_URL),
+  apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.7:5000/api',
 } as const;

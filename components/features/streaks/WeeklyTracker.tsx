@@ -1,7 +1,8 @@
-import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
 import { fontFamilies } from '@/theme/typography';
 
 export interface DayTrackerItem {
@@ -22,13 +23,13 @@ interface WeeklyTrackerProps {
 }
 
 const DEFAULT_DAYS: DayTrackerItem[] = [
-  { dayName: 'MON', dateNum: '04', status: 'completed' },
-  { dayName: 'TUE', dateNum: '05', status: 'completed' },
-  { dayName: 'WED', dateNum: '06', status: 'completed' },
-  { dayName: 'THU', dateNum: '07', status: 'today', isToday: true },
-  { dayName: 'FRI', dateNum: '08', status: 'locked' },
-  { dayName: 'SAT', dateNum: '09', status: 'locked' },
-  { dayName: 'SUN', dateNum: '10', status: 'locked' },
+  { dayName: 'MON', dateNum: '05', status: 'completed' },
+  { dayName: 'TUE', dateNum: '06', status: 'completed' },
+  { dayName: 'WED', dateNum: '07', status: 'completed' },
+  { dayName: 'THU', dateNum: '08', status: 'completed' },
+  { dayName: 'FRI', dateNum: '09', status: 'today', isToday: true },
+  { dayName: 'SAT', dateNum: '10', status: 'locked' },
+  { dayName: 'SUN', dateNum: '11', status: 'locked' },
 ];
 
 const DEFAULT_CHARACTER_IMAGE = require('@/assets/images/Avatar2.png');
@@ -42,8 +43,38 @@ export function WeeklyTracker({
   characterImageSource = DEFAULT_CHARACTER_IMAGE,
   onDayPress,
 }: WeeklyTrackerProps) {
-  const completedCount = completedDaysCount ?? days.filter(d => d.status === 'completed' || d.status === 'today').length;
-  const imageSource = typeof characterImageSource === 'string' ? { uri: characterImageSource } : characterImageSource;
+  const completedCount =
+    completedDaysCount ?? days.filter(d => d.status === 'completed' || d.status === 'today').length;
+  const imageSource =
+    typeof characterImageSource === 'string' ? { uri: characterImageSource } : characterImageSource;
+
+  // Calculate active index for the timeline connecting path line
+  const activeIndex = useMemo(() => {
+    const todayIdx = days.findIndex(d => d.isToday || d.status === 'today');
+    if (todayIdx !== -1) return todayIdx;
+    for (let i = days.length - 1; i >= 0; i--) {
+      if (days[i].status === 'completed') return i;
+    }
+    return 0;
+  }, [days]);
+
+  const totalDays = days.length;
+  const completedRatio = totalDays > 1 ? activeIndex / (totalDays - 1) : 0;
+
+  // Animated moving path progress line
+  const pathAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    pathAnim.setValue(0);
+    Animated.timing(pathAnim, {
+      toValue: completedRatio,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+  }, [completedRatio]);
+
+  // Node horizontal margins for 7 items
+  const nodeMarginPercent = (1 / (2 * totalDays)) * 100; // ~7.14%
 
   // Circular Progress calculations
   const radius = 20;
@@ -52,82 +83,48 @@ export function WeeklyTracker({
   const progressRatio = totalDaysCount > 0 ? completedCount / totalDaysCount : 0;
   const strokeDashoffset = circumference * (1 - progressRatio);
 
-  // Chevron Progress Bar renderer
-  const renderSegmentedChevrons = () => {
-    const totalSegments = 7;
-    const viewWidth = 350;
-    const viewHeight = 16;
-    const stepWidth = viewWidth / totalSegments;
-    const slant = 8;
-    const gap = 2.5;
-
-    return (
-      <Svg
-        width="100%"
-        height={viewHeight}
-        viewBox={`0 0 ${viewWidth} ${viewHeight}`}
-        preserveAspectRatio="none"
-      >
-        {Array.from({ length: totalSegments }).map((_, index) => {
-          const isFilled = index < completedCount;
-          const fillColor = isFilled ? '#FE5B01' : '#26262E';
-
-          const xLeft = index * stepWidth;
-          const xRight = (index + 1) * stepWidth;
-
-          let pathD = '';
-
-          if (index === 0) {
-            pathD = `M 4 0 L ${xRight - slant} 0 L ${xRight} 8 L ${xRight - slant} 16 L 4 16 C 1.8 16 0 14.2 0 12 L 0 4 C 0 1.8 1.8 0 4 0 Z`;
-          } else if (index === totalSegments - 1) {
-            pathD = `M ${xLeft - slant + gap} 0 L ${xRight - 4} 0 C ${xRight - 1.8} 0 ${xRight} 1.8 ${xRight} 4 L ${xRight} 12 C ${xRight} 14.2 ${xRight - 1.8} 16 ${xRight - 4} 16 L ${xLeft - slant + gap} 16 L ${xLeft + gap} 8 Z`;
-          } else {
-            pathD = `M ${xLeft - slant + gap} 0 L ${xRight - slant} 0 L ${xRight} 8 L ${xRight - slant} 16 L ${xLeft - slant + gap} 16 L ${xLeft + gap} 8 Z`;
-          }
-
-          return <Path key={index} d={pathD} fill={fillColor} />;
-        })}
-      </Svg>
-    );
-  };
-
   return (
     <View style={styles.container}>
-      {/* HEADER ROW */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerTitleGroup}>
-          <View style={styles.titleWithIcon}>
-            <View style={styles.orangeIconBadge}>
-              <MaterialCommunityIcons name="star-four-points" size={14} color="#FE5B01" />
-            </View>
-            <Text style={styles.headerTitle}>WEEKLY TRACKER</Text>
-          </View>
-          <Text style={styles.headerSubtitle}>{subtitleMessage}</Text>
-        </View>
-
-        {/* STREAK BADGE */}
-        <View style={styles.streakBadge}>
-          <Ionicons name="flame" size={22} color="#FE5B01" style={styles.flameIcon} />
-          <View style={styles.streakTextColumn}>
-            <Text style={styles.streakLabel}>WEEKLY STREAK</Text>
-            <Text style={styles.streakValue}>{streakDays} DAYS</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* DAYS ROW WITH CONNECTING TIMELINE LINE */}
+      {/* DAYS ROW WITH MOVING PATH TIMELINE LINE */}
       <View style={styles.daysRowContainer}>
         {/* Background Connecting Timeline Line */}
-        <View style={styles.timelineLineBackground}>
-          <View style={styles.timelineLineCompleted} />
-          <View style={styles.timelineLineRemaining} />
+        <View
+          style={[
+            styles.timelineLineBackground,
+            { left: `${nodeMarginPercent}%`, right: `${nodeMarginPercent}%` },
+          ]}
+        >
+          {/* Base Inactive Path Line */}
+          <View style={styles.timelineBaseLine} />
+
+          {/* Animated Active Glowing Orange Moving Path */}
+          <Animated.View
+            style={[
+              styles.timelineActiveLine,
+              {
+                width: pathAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={['#FE5B01', '#FF8800', '#FE5B01']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Glowing particle head at the moving path tip */}
+            <View style={styles.timelineLeadGlow} />
+          </Animated.View>
         </View>
 
+        {/* Days List */}
         <View style={styles.daysRow}>
           {days.map((item, index) => {
             const isToday = item.isToday || item.status === 'today';
             const isCompleted = item.status === 'completed';
-            const isLocked = item.status === 'locked';
 
             if (isToday) {
               return (
@@ -138,11 +135,9 @@ export function WeeklyTracker({
                 >
                   <Text style={styles.todayDayName}>{item.dayName}</Text>
 
-                  {/* Glowing Double Ring Star Icon */}
-                  <View style={styles.todayStarCircleOuter}>
-                    <View style={styles.todayStarCircleInner}>
-                      <MaterialCommunityIcons name="star-four-points" size={16} color="#FFFFFF" />
-                    </View>
+                  {/* Circle Node inside TODAY card */}
+                  <View style={styles.todayCircleNode}>
+                    <Ionicons name="checkmark" size={16} color="#FE5B01" />
                   </View>
 
                   <Text style={styles.todayDateNum}>{item.dateNum}</Text>
@@ -163,7 +158,7 @@ export function WeeklyTracker({
               >
                 <Text style={styles.normalDayName}>{item.dayName}</Text>
 
-                {/* Status Circle */}
+                {/* Status Circle Node */}
                 {isCompleted ? (
                   <View style={styles.completedCircle}>
                     <Ionicons name="checkmark" size={14} color="#FE5B01" />
@@ -185,11 +180,7 @@ export function WeeklyTracker({
       <View style={styles.bottomCard}>
         {/* Full-Height Right Overlay Character Image */}
         <View style={styles.characterImageWrapper} pointerEvents="none">
-          <Image
-            source={imageSource}
-            style={styles.characterImage}
-            resizeMode="cover"
-          />
+          <Image source={imageSource} style={styles.characterImage} resizeMode="cover" />
         </View>
 
         <View style={styles.bottomCardContent}>
@@ -235,14 +226,28 @@ export function WeeklyTracker({
           <View style={styles.encouragementSection}>
             <Text style={styles.encouragementTitle}>Keep it up, hunter!</Text>
             <Text style={styles.encouragementSubtext}>
-              {totalDaysCount - completedCount} more days to complete
+              <Text style={styles.orangeHighlightNumber}>
+                {Math.max(0, totalDaysCount - completedCount)}
+              </Text>
+              {' more days to complete'}
             </Text>
           </View>
         </View>
 
-        {/* CHEVRON PROGRESS BAR */}
-        <View style={styles.chevronContainer}>
-          {renderSegmentedChevrons()}
+        {/* BOTTOM SEGMENTED PROGRESS BAR */}
+        <View style={styles.segmentedBarRow}>
+          {Array.from({ length: totalDaysCount }).map((_, index) => {
+            const isFilled = index < completedCount;
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.segmentBarItem,
+                  { backgroundColor: isFilled ? '#FE5B01' : '#26262E' },
+                ]}
+              />
+            );
+          })}
         </View>
       </View>
     </View>
@@ -329,7 +334,7 @@ const styles = StyleSheet.create({
     color: '#FE5B01',
   },
 
-  /* DAYS ROW & TIMELINE LINE */
+  /* DAYS ROW & MOVING TIMELINE PATH */
   daysRowContainer: {
     position: 'relative',
     marginBottom: 18,
@@ -337,20 +342,41 @@ const styles = StyleSheet.create({
   },
   timelineLineBackground: {
     position: 'absolute',
-    top: 40,
-    left: 24,
-    right: 24,
-    height: 2,
-    flexDirection: 'row',
+    top: 38,
+    height: 3,
     zIndex: 0,
   },
-  timelineLineCompleted: {
-    flex: 5,
-    backgroundColor: '#FE5B01',
+  timelineBaseLine: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#26262E',
+    borderRadius: 2,
   },
-  timelineLineRemaining: {
-    flex: 2,
-    backgroundColor: '#282830',
+  timelineActiveLine: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+    overflow: 'visible',
+    shadowColor: '#FE5B01',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  timelineLeadGlow: {
+    position: 'absolute',
+    right: -4,
+    top: -2,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#FE5B01',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 5,
+    elevation: 6,
   },
 
   daysRow: {
@@ -366,24 +392,28 @@ const styles = StyleSheet.create({
   normalDayName: {
     fontFamily: fontFamilies.medium,
     fontSize: 11,
-    color: '#8E8E93',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   completedCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1.5,
     borderColor: '#FE5B01',
     backgroundColor: '#0F0F12',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    shadowColor: '#FE5B01',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
   },
   lockedCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1.5,
     borderColor: '#26262E',
     backgroundColor: '#0F0F12',
@@ -394,72 +424,71 @@ const styles = StyleSheet.create({
   normalDateNum: {
     fontFamily: fontFamilies.medium,
     fontSize: 12,
-    color: '#71717A',
+    color: '#FFFFFF',
   },
 
   /* TODAY HIGHLIGHT CARD */
   todayCardContainer: {
     alignItems: 'center',
-    backgroundColor: '#1C1814',
+    flex: 1,
+    alignSelf: 'stretch',
+    marginVertical: -10,
+    paddingTop: 6,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
+    backgroundColor: '#1E1915',
     borderWidth: 1.5,
     borderColor: '#FE5B01',
-    borderRadius: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    marginHorizontal: 2,
+    borderRadius: 14,
+    overflow: 'hidden',
+    justifyContent: 'space-between',
     shadowColor: '#FE5B01',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.6,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 8,
     zIndex: 2,
   },
   todayDayName: {
     fontFamily: fontFamilies.bold,
     fontSize: 11,
-    color: '#FE5B01',
-    marginBottom: 6,
+    color: '#FFFFFF',
+    marginTop: 2,
+    marginBottom: 4,
   },
-  todayStarCircleOuter: {
+  todayCircleNode: {
     width: 34,
     height: 34,
     borderRadius: 17,
     borderWidth: 1.5,
     borderColor: '#FE5B01',
+    backgroundColor: '#2A170D',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#35180B',
-    marginBottom: 6,
+    marginBottom: 4,
     shadowColor: '#FE5B01',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
+    shadowOpacity: 0.8,
     shadowRadius: 6,
-  },
-  todayStarCircleInner: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FE5B01',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   todayDateNum: {
     fontFamily: fontFamilies.bold,
-    fontSize: 13,
+    fontSize: 12,
     color: '#FFFFFF',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   todayPillBadge: {
     backgroundColor: '#FE5B01',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    width: '100%',
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   todayPillText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 8,
+    fontSize: 9,
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
 
   /* BOTTOM CARD */
@@ -470,14 +499,14 @@ const styles = StyleSheet.create({
     borderColor: '#22222A',
     paddingTop: 12,
     paddingHorizontal: 12,
-    paddingBottom: 10,
+    paddingBottom: 12,
     overflow: 'hidden',
     position: 'relative',
   },
   bottomCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     position: 'relative',
     zIndex: 1,
     paddingRight: 75,
@@ -537,6 +566,11 @@ const styles = StyleSheet.create({
   encouragementSubtext: {
     fontFamily: fontFamilies.medium,
     fontSize: 11,
+    color: '#8E8E93',
+  },
+  orangeHighlightNumber: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 11,
     color: '#FE5B01',
   },
 
@@ -555,10 +589,19 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
-  /* CHEVRON CONTAINER */
-  chevronContainer: {
+  /* SEGMENTED BAR */
+  segmentedBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     width: '100%',
-    height: 16,
     zIndex: 1,
   },
+  segmentBarItem: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    marginHorizontal: 2,
+  },
 });
+
