@@ -300,7 +300,7 @@ export default function ProfileScreen() {
         setIsSettingsModalVisible(true);
         break;
       case 'rewards':
-        setActiveModal('Rewards');
+        router.push('/rewards');
         break;
       case 'rate_app':
         setIsRateModalVisible(true);
@@ -589,7 +589,7 @@ export default function ProfileScreen() {
             {/* Main Headline */}
             <View style={styles.inviteHeadlineGroup}>
               <Text style={styles.inviteHeadlineText}>
-                Give your friends 7 Days of Free HunterX Access
+                Share HunterX Access with Your Friends
               </Text>
               <Text style={styles.inviteSubheadlineText}>
                 Unlock legendary workouts & level up together!
@@ -614,9 +614,6 @@ export default function ProfileScreen() {
                   <View style={styles.guestPassRarityBadge}>
                     <Ionicons name="sparkles" size={12} color="#FBBF24" />
                     <Text style={styles.guestPassRarityText}>LEGENDARY GUEST PASS</Text>
-                  </View>
-                  <View style={styles.guestPassValBadge}>
-                    <Text style={styles.guestPassValText}>7 DAYS FREE</Text>
                   </View>
                 </View>
 
@@ -1136,6 +1133,8 @@ export default function ProfileScreen() {
           </ScrollView>
         </Screen>
       </Modal>
+
+
 
       {/* FULL RATE HUNTERX MODAL SCREEN */}
       <Modal
@@ -2193,6 +2192,8 @@ const styles = StyleSheet.create({
     color: '#F97316',
     fontWeight: '800',
   },
+
+
 
   mainQuestCrownBadge: {
     flexDirection: 'row',

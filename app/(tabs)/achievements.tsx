@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Dimensions,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,11 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { useRouter } from 'expo-router';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
+const CARD_WIDTH = (SCREEN_WIDTH - 52) / 2;
 
 export interface HunterBadge {
   id: string;
@@ -33,6 +36,7 @@ export interface StreakTrophy {
   streakDays: number;
   isUnlocked: boolean;
   unlockedDate?: string;
+  progress?: string;
   iconName: keyof typeof Ionicons.glyphMap;
 }
 
@@ -42,7 +46,7 @@ const HUNTER_BADGES: HunterBadge[] = [
     title: 'SPEED STRIKE',
     levelText: 'LVL 10',
     statText: 'MAX SPEED',
-    imageSource: require('@/assets/images/goku.jpg'),
+    imageSource: require('@/assets/images/badge_speed_strike.png'),
     gradientColors: ['#0284C7', '#38BDF8', '#7DD3FC'],
     mainColor: '#38BDF8',
   },
@@ -51,7 +55,7 @@ const HUNTER_BADGES: HunterBadge[] = [
     title: 'TITAN FORCE',
     levelText: 'LVL 18',
     statText: 'POWER RATING 5000',
-    imageSource: require('@/assets/images/naruto.jpg'),
+    imageSource: require('@/assets/images/badge_titan_force.png'),
     gradientColors: ['#1D4ED8', '#60A5FA', '#93C5FD'],
     mainColor: '#60A5FA',
   },
@@ -60,7 +64,7 @@ const HUNTER_BADGES: HunterBadge[] = [
     title: 'PHOENIX HEART',
     levelText: 'LVL 12',
     statText: 'REVIVE MASTER',
-    imageSource: require('@/assets/images/itachi.jpg'),
+    imageSource: require('@/assets/images/badge_phoenix_heart.png'),
     gradientColors: ['#B91C1C', '#EF4444', '#FCA5A5'],
     mainColor: '#EF4444',
   },
@@ -69,7 +73,7 @@ const HUNTER_BADGES: HunterBadge[] = [
     title: 'STEALTH SHADOW',
     levelText: 'LVL 9',
     statText: 'NIGHT OPS',
-    imageSource: require('@/assets/images/jinwoo.jpg'),
+    imageSource: require('@/assets/images/badge_stealth_shadow.png'),
     gradientColors: ['#6D28D9', '#A855F7', '#E9D5FF'],
     mainColor: '#A855F7',
   },
@@ -78,7 +82,7 @@ const HUNTER_BADGES: HunterBadge[] = [
     title: 'VANGUARD SHIELD',
     levelText: 'LVL 14',
     statText: 'DEFENSE 3800',
-    imageSource: require('@/assets/images/gojo.jpg'),
+    imageSource: require('@/assets/images/badge_vanguard_shield.png'),
     gradientColors: ['#B45309', '#F59E0B', '#FDE68A'],
     mainColor: '#F59E0B',
   },
@@ -87,9 +91,45 @@ const HUNTER_BADGES: HunterBadge[] = [
     title: 'VIPER STRIKE',
     levelText: 'LVL 11',
     statText: 'CRITICAL HIT',
-    imageSource: require('@/assets/images/luffy.jpg'),
+    imageSource: require('@/assets/images/badge_viper_strike.png'),
     gradientColors: ['#047857', '#10B981', '#6EE7B7'],
     mainColor: '#10B981',
+  },
+  {
+    id: 'solo_monarch',
+    title: 'SOLO MONARCH',
+    levelText: 'LVL 20',
+    statText: 'SHADOW COMMANDER',
+    imageSource: require('@/assets/images/badge_solo_monarch.png'),
+    gradientColors: ['#581C87', '#9333EA', '#C084FC'],
+    mainColor: '#9333EA',
+  },
+  {
+    id: 'cursed_bound',
+    title: 'CURSED BOUND',
+    levelText: 'LVL 15',
+    statText: 'DOMAIN EXPANSION',
+    imageSource: require('@/assets/images/badge_cursed_bound.png'),
+    gradientColors: ['#991B1B', '#DC2626', '#FCA5A5'],
+    mainColor: '#DC2626',
+  },
+  {
+    id: 'dragon_soul',
+    title: 'DRAGON SOUL',
+    levelText: 'LVL 25',
+    statText: 'OVER 9000 XP',
+    imageSource: require('@/assets/images/badge_dragon_soul.png'),
+    gradientColors: ['#C2410C', '#EA580C', '#FDBA74'],
+    mainColor: '#EA580C',
+  },
+  {
+    id: 'streak_guardian',
+    title: 'STREAK GUARDIAN',
+    levelText: 'LVL 30',
+    statText: 'UNBROKEN CHAIN',
+    imageSource: require('@/assets/images/badge_streak_guardian.png'),
+    gradientColors: ['#D97706', '#F59E0B', '#FDE68A'],
+    mainColor: '#F59E0B',
   },
 ];
 
@@ -100,53 +140,97 @@ const STREAK_TROPHIES: StreakTrophy[] = [
     streakDays: 7,
     isUnlocked: true,
     unlockedDate: '08/13/26',
-    iconName: 'shield',
+    iconName: 'flame',
   },
   {
     id: '14_day',
     title: '14-Day Streak',
     streakDays: 14,
     isUnlocked: false,
-    iconName: 'paw',
+    progress: '0/14',
+    iconName: 'paw-outline',
   },
   {
     id: '33_day',
     title: '33-Day Streak',
     streakDays: 33,
     isUnlocked: false,
-    iconName: 'ribbon',
+    iconName: 'shield-half-outline',
   },
   {
     id: '66_day',
     title: '66-Day Streak',
     streakDays: 66,
     isUnlocked: false,
-    iconName: 'bonfire',
+    iconName: 'cut-outline',
   },
   {
     id: '96_day',
     title: '96-Day Streak',
     streakDays: 96,
     isUnlocked: false,
-    iconName: 'star',
+    iconName: 'sparkles-outline',
   },
   {
     id: '132_day',
     title: '132-Day Streak',
     streakDays: 132,
     isUnlocked: false,
-    iconName: 'trophy',
+    iconName: 'flash-outline',
+  },
+  {
+    id: '256_day',
+    title: '256-Day Streak',
+    streakDays: 256,
+    isUnlocked: false,
+    iconName: 'shield-checkmark-outline',
+  },
+  {
+    id: '365_day',
+    title: '365-Day Streak',
+    streakDays: 365,
+    isUnlocked: false,
+    iconName: 'trophy-outline',
   },
 ];
 
 export default function AchievementsScreen() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'badges' | 'streaks'>('badges');
+
+  const handleContactSupport = async () => {
+    const email = 'support@hunterx.app';
+    const subject = encodeURIComponent('Streak Loss Support Request');
+    const body = encodeURIComponent('Hello HunterX Support Team,\n\nI need assistance regarding a streak loss on my account.\n\nThank you!');
+    const url = `mailto:${email}?subject=${subject}&body=${body}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Contact Support', `Please email us at: ${email}`);
+      }
+    } catch {
+      Alert.alert('Contact Support', `Please email us at: ${email}`);
+    }
+  };
 
   return (
     <Screen style={styles.container}>
       {/* Top Header */}
       <View style={styles.headerBar}>
+        <TouchableOpacity
+          style={styles.navBackButton}
+          activeOpacity={0.7}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+
         <Text style={styles.headerTitle}>ACHIEVEMENTS</Text>
+
+        <View style={{ width: 24 }} />
       </View>
 
       {/* Segmented Tab Switcher */}
@@ -176,11 +260,11 @@ export default function AchievementsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {activeTab === 'badges' ? (
-          /* TAB 1: HUNTER BADGES GRID (WITH REAL ARTWORK IMAGES) */
+          /* TAB 1: HUNTER BADGES GRID (10 HUNTER BADGES) */
           <View style={styles.gridContainer}>
             {HUNTER_BADGES.map((badge) => (
               <View key={badge.id} style={styles.badgeCard}>
-                {/* 3D Metallic Gradient Emblem Frame with Real Image */}
+                {/* 3D Metallic Gradient Emblem Frame */}
                 <LinearGradient
                   colors={badge.gradientColors}
                   start={{ x: 0, y: 0 }}
@@ -199,22 +283,15 @@ export default function AchievementsScreen() {
                 {/* Badge Title */}
                 <Text style={styles.badgeTitle}>{badge.title}</Text>
 
-                {/* Level & Stat Pill Tag */}
-                <View style={styles.badgePillTag}>
-                  <Text style={styles.badgePillText}>
-                    {badge.levelText} <Text style={{ color: '#52525B' }}>|</Text> {badge.statText}
-                  </Text>
-                </View>
-
-                {/* HunterX Subtitle Tag */}
-                <View style={styles.hunterBrandTag}>
-                  <Text style={styles.hunterBrandText}>HUNTERX</Text>
-                </View>
+                {/* Level & Stat Text */}
+                <Text style={styles.badgeSubText}>
+                  {badge.levelText} • {badge.statText}
+                </Text>
               </View>
             ))}
           </View>
         ) : (
-          /* TAB 2: STREAK TROPHIES GRID (MATCHING SAMPLE SCREENSHOT 2) */
+          /* TAB 2: STREAK TROPHIES GRID (CLEAN FLOATING ICON DESIGN) */
           <View style={styles.streaksContainer}>
             {/* Top Subtitle Prompt */}
             <Text style={styles.streakPromptText}>
@@ -225,26 +302,28 @@ export default function AchievementsScreen() {
             <View style={styles.gridContainer}>
               {STREAK_TROPHIES.map((trophy) => (
                 <View key={trophy.id} style={styles.streakCard}>
-                  {/* Streak Emblem Icon */}
-                  <View
-                    style={[
-                      styles.streakEmblemCircle,
-                      trophy.isUnlocked ? styles.streakEmblemUnlocked : styles.streakEmblemLocked,
-                    ]}
-                  >
+                  {/* Clean Emblem Icon - NO circular or hexagonal background wrappers! */}
+                  <View style={styles.streakIconWrapper}>
                     <Ionicons
                       name={trophy.iconName}
-                      size={32}
+                      size={48}
                       color={trophy.isUnlocked ? '#F97316' : '#52525B'}
                     />
-                    <Text
+                    <View
                       style={[
-                        styles.streakBadgeTag,
-                        trophy.isUnlocked ? styles.streakBadgeTagUnlocked : styles.streakBadgeTagLocked,
+                        styles.streakPillTag,
+                        trophy.isUnlocked ? styles.streakPillTagUnlocked : styles.streakPillTagLocked,
                       ]}
                     >
-                      {trophy.streakDays}-DAY
-                    </Text>
+                      <Text
+                        style={[
+                          styles.streakPillTagText,
+                          trophy.isUnlocked ? styles.streakPillTagTextUnlocked : styles.streakPillTagTextLocked,
+                        ]}
+                      >
+                        {trophy.streakDays}-DAY
+                      </Text>
+                    </View>
                   </View>
 
                   {/* Trophy Title */}
@@ -257,12 +336,27 @@ export default function AchievementsScreen() {
                     {trophy.title}
                   </Text>
 
-                  {/* Unlocked Date */}
-                  {trophy.isUnlocked && (
+                  {/* Date or Progress Subtitle */}
+                  {trophy.isUnlocked && trophy.unlockedDate ? (
                     <Text style={styles.streakUnlockedDate}>{trophy.unlockedDate}</Text>
-                  )}
+                  ) : trophy.progress ? (
+                    <Text style={styles.streakProgressDate}>{trophy.progress}</Text>
+                  ) : null}
                 </View>
               ))}
+            </View>
+
+            {/* Bottom Contact Support Section */}
+            <View style={styles.contactSupportContainer}>
+              <Text style={styles.contactSupportTitle}>Issues with streak loss?</Text>
+              <TouchableOpacity
+                style={styles.contactSupportBtn}
+                activeOpacity={0.8}
+                onPress={handleContactSupport}
+              >
+                <Ionicons name="mail-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.contactSupportBtnText}>Contact Support</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -279,11 +373,17 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   headerBar: {
-    paddingVertical: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#1E1E24',
     marginBottom: 14,
+  },
+  navBackButton: {
+    padding: 4,
+    marginLeft: -4,
   },
   headerTitle: {
     fontFamily: fontFamilies.bold,
@@ -328,25 +428,22 @@ const styles = StyleSheet.create({
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    rowGap: 24,
+    columnGap: 16,
     justifyContent: 'space-between',
   },
 
   /* TAB 1: HUNTER BADGES STYLES */
   badgeCard: {
     width: CARD_WIDTH,
-    backgroundColor: '#121215',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#242428',
-    padding: 16,
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    marginVertical: 4,
   },
   emblemOuterRing: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     padding: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -359,7 +456,7 @@ const styles = StyleSheet.create({
   emblemInnerDarkCircle: {
     width: '100%',
     height: '100%',
-    borderRadius: 35,
+    borderRadius: 37,
     overflow: 'hidden',
     backgroundColor: '#101014',
   },
@@ -375,41 +472,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textAlign: 'center',
   },
-  badgePillTag: {
-    backgroundColor: '#1A1A20',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2E2E36',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  badgePillText: {
+  badgeSubText: {
     fontFamily: fontFamilies.bold,
     fontSize: 10,
     fontWeight: '800',
     color: '#A1A1AA',
     letterSpacing: 0.5,
-  },
-  hunterBrandTag: {
-    backgroundColor: '#16161A',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#27272A',
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-  },
-  hunterBrandText: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#F97316',
-    letterSpacing: 1.5,
+    textAlign: 'center',
   },
 
-  /* TAB 2: STREAK TROPHIES STYLES */
+  /* TAB 2: STREAK TROPHIES STYLES (CLEAN FLOATING ICON DESIGN) */
   streaksContainer: {
-    gap: 16,
+    gap: 20,
   },
   streakPromptText: {
     fontFamily: fontFamilies.regular,
@@ -426,50 +500,42 @@ const styles = StyleSheet.create({
   },
   streakCard: {
     width: CARD_WIDTH,
-    backgroundColor: '#101013',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#1E1E24',
-    padding: 16,
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    marginVertical: 4,
   },
-  streakEmblemCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+  streakIconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 70,
     position: 'relative',
   },
-  streakEmblemUnlocked: {
-    backgroundColor: 'rgba(249, 115, 22, 0.12)',
-    borderWidth: 1.5,
+  streakPillTag: {
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  streakPillTagUnlocked: {
+    backgroundColor: 'rgba(249, 115, 22, 0.2)',
+    borderWidth: 1,
     borderColor: '#F97316',
   },
-  streakEmblemLocked: {
-    backgroundColor: '#16161A',
-    borderWidth: 1.5,
-    borderColor: '#2E2E36',
+  streakPillTagLocked: {
+    backgroundColor: '#1C1C22',
+    borderWidth: 1,
+    borderColor: '#2A2A32',
   },
-  streakBadgeTag: {
-    position: 'absolute',
-    bottom: -6,
+  streakPillTagText: {
     fontFamily: fontFamilies.bold,
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 0.5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    overflow: 'hidden',
   },
-  streakBadgeTagUnlocked: {
-    backgroundColor: '#F97316',
-    color: '#FFFFFF',
+  streakPillTagTextUnlocked: {
+    color: '#F97316',
   },
-  streakBadgeTagLocked: {
-    backgroundColor: '#27272A',
+  streakPillTagTextLocked: {
     color: '#71717A',
   },
   streakTitle: {
@@ -477,17 +543,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
   streakTitleUnlocked: {
     color: '#F97316',
   },
   streakTitleLocked: {
-    color: '#71717A',
+    color: '#FFFFFF',
   },
   streakUnlockedDate: {
     fontFamily: fontFamilies.regular,
     fontSize: 11,
     color: '#71717A',
+  },
+  streakProgressDate: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 11,
+    color: '#52525B',
+  },
+
+  /* BOTTOM CONTACT SUPPORT STYLES */
+  contactSupportContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#18181C',
+  },
+  contactSupportTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  contactSupportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#27272A',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#3F3F46',
+  },
+  contactSupportBtnText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

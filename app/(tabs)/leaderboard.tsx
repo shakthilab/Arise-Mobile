@@ -1,30 +1,67 @@
-import { StyleSheet, Text } from 'react-native';
-
-import { Screen } from '@/components/common/Screen';
-import { LeaderboardList } from '@/components/features/leaderboard/LeaderboardList';
-import { useLeaderboard } from '@/hooks/useLeaderboard';
-import { colors } from '@/theme/colors';
-import { spacing } from '@/theme/spacing';
-import { typography } from '@/theme/typography';
+import React from 'react';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { fontFamilies } from '@/theme/typography';
 
 export default function LeaderboardScreen() {
-  const { entries, isLoading } = useLeaderboard();
-
   return (
-    <Screen style={styles.container}>
-      <Text style={styles.title}>Leaderboard</Text>
-      <LeaderboardList entries={entries} isLoading={isLoading} />
-    </Screen>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#0D0D11', '#070709', '#030304']}
+          style={StyleSheet.absoluteFillObject}
+        />
+
+        <View style={styles.headerBar}>
+          <Text style={styles.title}>HUNTER ARENA</Text>
+          <Text style={styles.subtitle}>GLOBAL LEADERBOARD</Text>
+        </View>
+
+        <View style={styles.emptyContent}>
+          <Text style={styles.emptyText}>Leaderboard Coming Soon</Text>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#070709',
+  },
   container: {
-    padding: spacing.lg,
-    gap: spacing.md,
+    flex: 1,
+    backgroundColor: '#070709',
+  },
+  headerBar: {
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 12,
   },
   title: {
-    ...typography.title,
-    color: colors.textPrimary,
+    fontFamily: fontFamilies.bold,
+    fontSize: 22,
+    color: '#FFFFFF',
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 10,
+    color: '#71717A',
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  emptyContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontFamily: fontFamilies.medium,
+    color: '#71717A',
+    fontSize: 14,
   },
 });
