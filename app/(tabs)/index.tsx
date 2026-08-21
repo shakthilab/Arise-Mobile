@@ -21,9 +21,11 @@ import { QuestActionModal } from '@/components/features/missions/QuestActionModa
 import { TaskCompletedToast } from '@/components/features/missions/TaskCompletedToast';
 import { TaskCompletionScreen } from '@/components/features/missions/TaskCompletionScreen';
 import { WeeklyTracker } from '@/components/features/streaks/WeeklyTracker';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { useLootDrop } from '@/hooks/useLootDrop';
 import { fontFamilies } from '@/theme/typography';
+import { getAvatarSource } from './profile';
 
 export interface QuestItem {
   id: string;
@@ -87,7 +89,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     title: 'Run 10km',
     category: 'CARDIO',
     xpReward: 10,
-    type: 'daily',
+    type: 'weekly',
     showTickButton: true,
     showWrongButton: true,
     hasStatusPopup: false,
@@ -180,10 +182,14 @@ function AnimatedWrongButton({ onPress }: { onPress: () => void }) {
 }
 
 export default function MissionsHomeScreen() {
-  const { user } = useAuth();
+  const { user, restoreSession } = useAuth();
   const { lastDrop, roll } = useLootDrop();
   const [dropVisible, setDropVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'todo' | 'done' | 'skipped'>('todo');
+
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
 
   const [quests, setQuests] = useState<QuestItem[]>(INITIAL_QUESTS);
   const [selectedQuest, setSelectedQuest] = useState<QuestItem | null>(null);
@@ -196,7 +202,18 @@ export default function MissionsHomeScreen() {
   const displayName = user?.displayName ? user.displayName.toUpperCase() : 'SEYMEN';
   const displayXP = (user?.xp ?? 1240).toLocaleString();
   const displayLevel = user?.level ?? 8;
-  const displayStreak = user?.currentStreak ?? 16;
+  const displayStreak = user?.currentStreak ?? user?.user_progression?.daily_streak ?? 16;
+  const completedDays = user?.completedDaysCount ?? user?.weeklyStreak ?? user?.user_progression?.weekly_streak ?? (displayStreak > 0 ? Math.min(displayStreak, 7) : 5);
+
+  const getQuestTargetValue = (quest: QuestItem) => {
+    if (quest.title === 'Protein Goal') {
+      const goal = user?.daily_protein_goal;
+      if (goal) {
+        return `${goal} g`;
+      }
+    }
+    return quest.targetValue;
+  };
 
   const todoQuests = quests.filter((q) => q.status === 'todo');
   const doneQuests = quests.filter((q) => q.status === 'done' || q.status === 'partial');
@@ -305,7 +322,7 @@ export default function MissionsHomeScreen() {
         <View style={styles.topHeader}>
           <View style={styles.userProfileGroup}>
             <View style={styles.avatarWrapper}>
-              <Image source={{ uri: ANIME_AVATARS[0] }} style={styles.avatarImage} />
+              <Image source={getAvatarSource(user?.avatarUrl)} style={styles.avatarImage} />
               <View style={styles.levelBadgeCircle}>
                 <Text style={styles.levelBadgeText}>{displayLevel}</Text>
               </View>
@@ -329,43 +346,14 @@ export default function MissionsHomeScreen() {
           </View>
         </View>
 
-        {/* WEEKLY TRACKER (2ND ITEM) */}
-        <WeeklyTracker streakDays={displayStreak} completedDaysCount={5} />
-
         {/* ACTIVE CAMPAIGN SECTION */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitleWide}>ACTIVE CAMPAIGN</Text>
           <Text style={styles.dayCounterText}>Day 01 / 100</Text>
         </View>
 
-        <View style={styles.campaignCardContainer}>
-          <ImageBackground
-            source={require('@/assets/images/active_campaign_bg.jpg')}
-            style={styles.campaignBgImage}
-            imageStyle={styles.campaignBgStyle}
-          >
-            <View style={styles.campaignOverlay}>
-              {/* Main Banner Title */}
-              <View style={styles.campaignTitleContainer}>
-                <Text style={styles.campaignTitleLine}>RISE</Text>
-                <Text style={styles.campaignTitleLine}>AGAIN</Text>
-              </View>
-
-              {/* Bottom details row */}
-              <View style={styles.campaignDetailsRow}>
-                <View>
-                  <Text style={styles.campaignDetailLabel}>OBJECTIVE</Text>
-                  <Text style={styles.campaignDetailValue}>Complete 4 Quests</Text>
-                </View>
-
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.campaignDetailLabel}>PROGRESS</Text>
-                  <Text style={styles.campaignDetailValue}>0/4</Text>
-                </View>
-              </View>
-            </View>
-          </ImageBackground>
-        </View>
+        {/* WEEKLY TRACKER (2ND ITEM) */}
+        <WeeklyTracker streakDays={displayStreak} completedDaysCount={completedDays} />
 
         {/* FILTER TABS ROW */}
         <View style={styles.filterTabsRow}>
@@ -502,11 +490,6 @@ export default function MissionsHomeScreen() {
                         <View style={styles.questImageWrapper}>
                           <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
 
-                          <View style={styles.bottomLeftImageBadge}>
-                            <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                            <Text style={styles.routineBadgeText}>Routine</Text>
-                          </View>
-
                           <View style={styles.topRightActionsCol}>
                             <View style={styles.xpBadgeInline}>
                               <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
@@ -524,15 +507,21 @@ export default function MissionsHomeScreen() {
 
                         <View style={styles.questBody}>
                           <View style={styles.questTitleCol}>
-                            <View style={styles.categoryPill}>
-                              <Text style={styles.categoryPillText}>{quest.category}</Text>
+                            <View style={styles.categoryRow}>
+                              <View style={styles.categoryPill}>
+                                <Text style={styles.categoryPillText}>{quest.category}</Text>
+                              </View>
+                              <View style={styles.routineBadgeInline}>
+                                <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                                <Text style={styles.routineBadgeText}>Routine</Text>
+                              </View>
                             </View>
                             <Text style={styles.questTitle}>{quest.title}</Text>
                           </View>
 
-                          {quest.targetValue && (
+                          {getQuestTargetValue(quest) && (
                             <View style={styles.targetValueBox}>
-                              <Text style={styles.targetValueText}>{quest.targetValue}</Text>
+                              <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
                             </View>
                           )}
                         </View>
@@ -550,11 +539,6 @@ export default function MissionsHomeScreen() {
                         <View style={styles.questImageWrapper}>
                           <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
 
-                          <View style={styles.bottomLeftImageBadge}>
-                            <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                            <Text style={styles.routineBadgeText}>Weekly</Text>
-                          </View>
-
                           <View style={styles.topRightActionsCol}>
                             <View style={styles.xpBadgeInline}>
                               <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
@@ -572,15 +556,21 @@ export default function MissionsHomeScreen() {
 
                         <View style={styles.questBody}>
                           <View style={styles.questTitleCol}>
-                            <View style={styles.categoryPill}>
-                              <Text style={styles.categoryPillText}>{quest.category}</Text>
+                            <View style={styles.categoryRow}>
+                              <View style={styles.categoryPill}>
+                                <Text style={styles.categoryPillText}>{quest.category}</Text>
+                              </View>
+                              <View style={styles.routineBadgeInline}>
+                                <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                                <Text style={styles.routineBadgeText}>Weekly</Text>
+                              </View>
                             </View>
                             <Text style={styles.questTitle}>{quest.title}</Text>
                           </View>
 
-                          {quest.targetValue && (
+                          {getQuestTargetValue(quest) && (
                             <View style={styles.targetValueBox}>
-                              <Text style={styles.targetValueText}>{quest.targetValue}</Text>
+                              <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
                             </View>
                           )}
                         </View>
@@ -612,11 +602,6 @@ export default function MissionsHomeScreen() {
                     <View style={styles.questImageWrapper}>
                       <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
 
-                      <View style={styles.bottomLeftImageBadge}>
-                        <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                        <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
-                      </View>
-
                       <View
                         style={[
                           styles.xpBadgeTopRight,
@@ -641,8 +626,14 @@ export default function MissionsHomeScreen() {
 
                     <View style={styles.questBody}>
                       <View style={styles.questTitleCol}>
-                        <View style={styles.categoryPill}>
-                          <Text style={styles.categoryPillText}>{quest.category}</Text>
+                        <View style={styles.categoryRow}>
+                          <View style={styles.categoryPill}>
+                            <Text style={styles.categoryPillText}>{quest.category}</Text>
+                          </View>
+                          <View style={styles.routineBadgeInline}>
+                            <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                            <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
+                          </View>
                         </View>
                         <Text style={styles.questTitle}>{quest.title}</Text>
                       </View>
@@ -679,11 +670,6 @@ export default function MissionsHomeScreen() {
                   <View style={styles.questImageWrapper}>
                     <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
 
-                    <View style={styles.bottomLeftImageBadge}>
-                      <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                      <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
-                    </View>
-
                     <View style={[styles.xpBadgeTopRight, styles.skippedBadgeContainer]}>
                       <Ionicons name="play-skip-forward" size={14} color="#A1A1AA" />
                       <Text style={[styles.xpBadgeText, { color: '#A1A1AA' }]}>SKIPPED</Text>
@@ -692,8 +678,14 @@ export default function MissionsHomeScreen() {
 
                   <View style={styles.questBody}>
                     <View style={styles.questTitleCol}>
-                      <View style={styles.categoryPill}>
-                        <Text style={styles.categoryPillText}>{quest.category}</Text>
+                      <View style={styles.categoryRow}>
+                        <View style={styles.categoryPill}>
+                          <Text style={styles.categoryPillText}>{quest.category}</Text>
+                        </View>
+                        <View style={styles.routineBadgeInline}>
+                          <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                          <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
+                        </View>
                       </View>
                       <Text style={styles.questTitle}>{quest.title}</Text>
                     </View>
@@ -1170,19 +1162,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 12,
   },
-  bottomLeftImageBadge: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  routineBadgeInline: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'transparent',
   },
   routineBadgeText: {
     fontFamily: fontFamilies.bold,
     fontSize: 10,
-    color: '#E4E4E7',
+    color: '#A1A1AA',
     letterSpacing: 0.5,
   },
   categoryPill: {
@@ -1193,7 +1187,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     borderWidth: 1,
     borderColor: '#2C2C2E',
-    marginBottom: 6,
   },
   categoryPillText: {
     fontFamily: fontFamilies.bold,
@@ -1345,6 +1338,15 @@ const styles = StyleSheet.create({
   },
 
   /* Badges & Reset Actions */
+  xpBadgeTopRight: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
   doneBadgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',

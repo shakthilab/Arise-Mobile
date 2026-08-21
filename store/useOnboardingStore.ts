@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import type { OnboardingAnswerPayload } from '@/services/api/auth.service';
+
 type OnboardingStore = {
   // User Profile fields
   hunterName: string;
@@ -18,7 +20,12 @@ type OnboardingStore = {
 
   // Time screen selection ("Commit daily")
   dailyTimeId: string | null;
-  dailyTimeLabel: string | null;
+  dailyTimeLabel: string | null; // display only — shown in the oath summary
+  // Canonical backend value, one of "15min" | "30min" | "1hr" | "2hr_plus".
+  // Kept separate from dailyTimeLabel (which is display-formatted, e.g.
+  // "1h") because the backend's protein-goal multiplier lookup needs these
+  // exact strings.
+  dailyTimeAnswer: string | null;
 
   // Setters
   setHunterName: (name: string) => void;
@@ -34,6 +41,7 @@ type OnboardingStore = {
   setMotivationIds: (ids: string[]) => void;
   setDailyTimeId: (id: string) => void;
   setDailyTimeLabel: (label: string) => void;
+  setDailyTimeAnswer: (answer: string) => void;
 
   // Reset all onboarding data
   resetOnboarding: () => void;
@@ -54,6 +62,7 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
   motivationIds: [],
   dailyTimeId: null,
   dailyTimeLabel: null,
+  dailyTimeAnswer: null,
 
   // Setters
   setHunterName: (name) => set({ hunterName: name }),
@@ -69,6 +78,7 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
   setMotivationIds: (ids) => set({ motivationIds: ids }),
   setDailyTimeId: (id) => set({ dailyTimeId: id }),
   setDailyTimeLabel: (label) => set({ dailyTimeLabel: label }),
+  setDailyTimeAnswer: (answer) => set({ dailyTimeAnswer: answer }),
 
   resetOnboarding: () =>
     set({
@@ -85,5 +95,39 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
       motivationIds: [],
       dailyTimeId: null,
       dailyTimeLabel: null,
+      dailyTimeAnswer: null,
     }),
 }));
+
+/**
+ * Maps the wizard's collected answers onto the backend's fixed 1-10
+ * questionId scheme. Shared by signup (email + Google) and by the oath
+ * screen when it's finishing onboarding for an account that already
+ * exists (Google sign-in from the Login screen, before this wizard ran).
+ */
+export function buildOnboardingAnswers(): OnboardingAnswerPayload[] {
+  const state = useOnboardingStore.getState();
+
+  const formattedHeight =
+    state.heightUnit === 'ft'
+      ? `${(state.height / 30.48).toFixed(1)}ft`
+      : `${Math.round(state.height)}cm`;
+
+  const formattedWeight =
+    state.weightUnit === 'lbs'
+      ? `${Math.round(state.weight * 2.20462)}lbs`
+      : `${Math.round(state.weight)}kg`;
+
+  return [
+    { questionId: 1, answer: state.hunterName || 'Hunter' },
+    { questionId: 2, answer: state.gender || 'male' },
+    { questionId: 3, answer: (state.age || 24).toString() },
+    { questionId: 4, answer: formattedHeight },
+    { questionId: 5, answer: formattedWeight },
+    { questionId: 6, answer: state.motivationIds.length > 0 ? state.motivationIds.join(',') : 'discipline' },
+    { questionId: 7, answer: state.weaknesses.length > 0 ? state.weaknesses.join(',') : 'none' },
+    { questionId: 8, answer: state.rank || 'beginner' },
+    { questionId: 9, answer: state.dailyTimeAnswer || '30min' },
+    { questionId: 10, answer: 'accepted' },
+  ];
+}

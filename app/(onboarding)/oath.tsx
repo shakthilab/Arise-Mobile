@@ -18,13 +18,13 @@ import { StepIndicator } from '@/components/common/StepIndicator';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 import { useAuth } from '@/hooks/useAuth';
-import { useOnboardingStore } from '@/store/useOnboardingStore';
+import { buildOnboardingAnswers, useOnboardingStore } from '@/store/useOnboardingStore';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 7; // eighth step (0-indexed)
 
 export default function OathScreen() {
-    const { completeOnboarding } = useAuth();
+    const { isAuthenticated, submitOnboarding } = useAuth();
     const motivationIds = useOnboardingStore((s) => s.motivationIds) || [];
     const rank = useOnboardingStore((s) => s.rank);
     const dailyTimeLabel = useOnboardingStore((s) => s.dailyTimeLabel);
@@ -32,6 +32,8 @@ export default function OathScreen() {
     const [checked1, setChecked1] = useState(false);
     const [checked2, setChecked2] = useState(false);
     const [checked3, setChecked3] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     const allChecked = checked1 && checked2 && checked3;
 
@@ -68,10 +70,27 @@ export default function OathScreen() {
         ],
     });
 
-    const handleSwearOath = () => {
+    const handleSwearOath = async () => {
         if (!allChecked) return;
 
-        // Navigate to signup screen after swearing the oath
+        // Already have an account — brand new Google sign-in from the Login
+        // screen, sent through this wizard after the fact. Attach the answers
+        // to that account instead of going through signup again.
+        if (isAuthenticated) {
+            setSubmitError(null);
+            setIsSubmitting(true);
+            try {
+                await submitOnboarding(buildOnboardingAnswers());
+                router.replace('/(onboarding)/ascension');
+            } catch (err) {
+                setSubmitError(err instanceof Error ? err.message : 'Could not save your answers');
+            } finally {
+                setIsSubmitting(false);
+            }
+            return;
+        }
+
+        // Normal path — navigate to signup screen after swearing the oath
         router.push('/(auth)/signup');
     };
 
@@ -195,11 +214,13 @@ export default function OathScreen() {
 
             {/* ─── Bottom CTA ─── */}
             <Animated.View style={[styles.bottomBar, fadeSlideStyle(buttonAnim)]}>
+                {submitError && <Text style={styles.errorText}>{submitError}</Text>}
                 <Button
                     label="I SWEAR THE OATH"
                     onPress={handleSwearOath}
                     variant="primary"
                     disabled={!allChecked}
+                    loading={isSubmitting}
                     style={styles.ctaButton}
                     labelStyle={styles.ctaLabel}
                 />
@@ -398,5 +419,12 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#FFFFFF',
         textAlign: 'center',
+    },
+    errorText: {
+        fontFamily: fontFamilies.regular,
+        fontSize: 13,
+        color: colors.danger,
+        textAlign: 'center',
+        marginBottom: 12,
     },
 });

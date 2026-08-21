@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Screen } from '@/components/common/Screen';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -199,18 +200,17 @@ export default function ProfileScreen() {
   // Generic Menu Modals State
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/(auth)/login');
-        },
-      },
-    ]);
+  // Alert.alert is a no-op on web (react-native-web ships it as `static alert() {}`),
+  // so logout/delete confirmations use ConfirmDialog (a real Modal) instead.
+  const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
+  const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
+
+  const handleLogout = () => setIsLogoutConfirmVisible(true);
+
+  const confirmLogout = async () => {
+    setIsLogoutConfirmVisible(false);
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   const handleSaveName = () => {
@@ -261,22 +261,12 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/login');
-          },
-        },
-      ]
-    );
+  const handleDeleteAccount = () => setIsDeleteConfirmVisible(true);
+
+  const confirmDeleteAccount = async () => {
+    setIsDeleteConfirmVisible(false);
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   const handleMenuPress = (key: string) => {
@@ -1726,6 +1716,26 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={isLogoutConfirmVisible}
+        title="Log Out"
+        message="Are you sure you want to log out?"
+        confirmLabel="Log Out"
+        destructive
+        onConfirm={confirmLogout}
+        onCancel={() => setIsLogoutConfirmVisible(false)}
+      />
+
+      <ConfirmDialog
+        visible={isDeleteConfirmVisible}
+        title="Delete Account"
+        message="Are you sure you want to delete your account? This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteAccount}
+        onCancel={() => setIsDeleteConfirmVisible(false)}
+      />
     </Screen>
   );
 }
@@ -3363,113 +3373,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  /* RECENT ACTIVITY MODAL STYLES */
-  recentActivityCard: {
-    width: '100%',
-    backgroundColor: '#121215',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#242428',
-    padding: 18,
-  },
-  recentActivityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  recentActivityHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 10,
-  },
-  recentActivityTitle: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  recentActivitySubtitle: {
-    fontFamily: fontFamilies.semiBold,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#A1A1AA',
-  },
-  recentTasksListContainer: {
-    backgroundColor: '#16161B',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#27272A',
-    overflow: 'hidden',
-  },
-  recentTaskItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  recentTaskItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#242428',
-  },
-  recentDayBox: {
-    width: 48,
-    height: 52,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-    backgroundColor: '#1C1C22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recentDayLabel: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#71717A',
-    letterSpacing: 0.5,
-    marginBottom: 1,
-  },
-  recentDayNumber: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    lineHeight: 20,
-  },
-  recentTaskTitle: {
-    fontFamily: fontFamilies.bold,
-    flex: 1,
-    marginLeft: 16,
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  recentRightCol: {
-    alignItems: 'flex-end',
-  },
-  recentXpBadge: {
-    backgroundColor: '#1C1C22',
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  recentXpText: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  recentTimeText: {
-    fontFamily: fontFamilies.medium,
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#71717A',
-    marginTop: 4,
-  },
+
 
   /* FOOTER SECTION */
   footerSection: {

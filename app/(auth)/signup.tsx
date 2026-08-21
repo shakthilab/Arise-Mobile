@@ -20,12 +20,13 @@ import { Screen } from '@/components/common/Screen';
 import { GoogleIcon } from '@/components/common/GoogleIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { resendOtp, verifyOtp } from '@/services/api/auth.service';
-import { useOnboardingStore } from '@/store/useOnboardingStore';
+import { isGoogleSignInCancelled, signInWithGoogle } from '@/services/auth/googleAuth';
+import { buildOnboardingAnswers, useOnboardingStore } from '@/store/useOnboardingStore';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
 export default function SignupScreen() {
-  const { signup, isAuthenticating } = useAuth();
+  const { signup, loginWithGoogle, isAuthenticating } = useAuth();
   const storeHunterName = useOnboardingStore((s) => s.hunterName);
   const verifiedEmail = useOnboardingStore((s) => s.verifiedEmail);
   const setVerifiedEmail = useOnboardingStore((s) => s.setVerifiedEmail);
@@ -37,6 +38,7 @@ export default function SignupScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   // OTP Popup Modal states
   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
@@ -216,32 +218,11 @@ export default function SignupScreen() {
     }
     const storeState = useOnboardingStore.getState();
 
-    const formattedHeight =
-      storeState.heightUnit === 'ft'
-        ? `${(storeState.height / 30.48).toFixed(1)}ft`
-        : `${Math.round(storeState.height)}cm`;
-
-    const formattedWeight =
-      storeState.weightUnit === 'lbs'
-        ? `${Math.round(storeState.weight * 2.20462)}lbs`
-        : `${Math.round(storeState.weight)}kg`;
-
     const registerPayload = {
       name: storeState.hunterName || 'Hunter',
       email: cleanEmail,
       password: password,
-      onboarding: [
-        { questionId: 1, answer: storeState.hunterName || 'Hunter' },
-        { questionId: 2, answer: storeState.gender || 'male' },
-        { questionId: 3, answer: (storeState.age || 24).toString() },
-        { questionId: 4, answer: formattedHeight },
-        { questionId: 5, answer: formattedWeight },
-        { questionId: 6, answer: storeState.motivationIds && storeState.motivationIds.length > 0 ? storeState.motivationIds.join(',') : 'discipline' },
-        { questionId: 7, answer: storeState.weaknesses.length > 0 ? storeState.weaknesses.join(',') : 'none' },
-        { questionId: 8, answer: storeState.rank || 'beginner' },
-        { questionId: 9, answer: storeState.dailyTimeLabel || '30min' },
-        { questionId: 10, answer: 'accepted' },
-      ],
+      onboarding: buildOnboardingAnswers(),
     };
 
     try {
@@ -249,6 +230,22 @@ export default function SignupScreen() {
       router.replace('/(onboarding)/ascension');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    setError(null);
+    setIsGoogleLoading(true);
+    try {
+      const idToken = await signInWithGoogle();
+      const { isNew } = await loginWithGoogle(idToken, buildOnboardingAnswers());
+      router.replace(isNew ? '/(onboarding)/ascension' : '/(tabs)');
+    } catch (err) {
+      if (!isGoogleSignInCancelled(err)) {
+        setError(err instanceof Error ? err.message : 'Google sign-in failed');
+      }
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -382,7 +379,7 @@ export default function SignupScreen() {
           label="CREATE ACCOUNT"
           onPress={handleSignup}
           loading={isAuthenticating}
-          disabled={!isFormValid}
+          disabled={!isFormValid || isGoogleLoading}
           variant="primary"
           style={[styles.signupButton, !isFormValid && styles.signupButtonDisabled]}
           labelStyle={[styles.signupButtonLabel, !isFormValid && styles.signupButtonLabelDisabled]}
@@ -398,7 +395,9 @@ export default function SignupScreen() {
         {/* Social Sign Up Buttons */}
         <Button
           label="Continue with Google"
-          onPress={() => {}}
+          onPress={handleGoogleSignup}
+          loading={isGoogleLoading}
+          disabled={isAuthenticating}
           variant="outline"
           icon={<GoogleIcon size={18} />}
           style={styles.socialButton}

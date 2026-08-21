@@ -22,20 +22,45 @@ interface WeeklyTrackerProps {
   onDayPress?: (day: DayTrackerItem) => void;
 }
 
-const DEFAULT_DAYS: DayTrackerItem[] = [
-  { dayName: 'MON', dateNum: '05', status: 'completed' },
-  { dayName: 'TUE', dateNum: '06', status: 'completed' },
-  { dayName: 'WED', dateNum: '07', status: 'completed' },
-  { dayName: 'THU', dateNum: '08', status: 'completed' },
-  { dayName: 'FRI', dateNum: '09', status: 'today', isToday: true },
-  { dayName: 'SAT', dateNum: '10', status: 'locked' },
-  { dayName: 'SUN', dateNum: '11', status: 'locked' },
-];
+export function generateCurrentWeekDays(completedCount?: number): DayTrackerItem[] {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const distanceToMon = (dayOfWeek + 6) % 7;
 
-const DEFAULT_CHARACTER_IMAGE = require('@/assets/images/Avatar2.png');
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - distanceToMon);
+
+  const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const targetCompletedCount = completedCount ?? (distanceToMon + 1);
+
+  return dayNames.map((dayName, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dateNum = String(d.getDate()).padStart(2, '0');
+    const isToday = i === distanceToMon;
+
+    let status: 'completed' | 'today' | 'locked' = 'locked';
+    if (isToday) {
+      status = 'today';
+    } else if (i < distanceToMon && i < targetCompletedCount) {
+      status = 'completed';
+    } else {
+      status = 'locked';
+    }
+
+    return {
+      dayName,
+      dateNum,
+      status,
+      isToday,
+    };
+  });
+}
+
+const DEFAULT_CHARACTER_IMAGE = require('@/assets/images/high_fidelity.png');
 
 export function WeeklyTracker({
-  days = DEFAULT_DAYS,
+  days,
   streakDays = 5,
   completedDaysCount,
   totalDaysCount = 7,
@@ -43,22 +68,27 @@ export function WeeklyTracker({
   characterImageSource = DEFAULT_CHARACTER_IMAGE,
   onDayPress,
 }: WeeklyTrackerProps) {
+  const activeDays = useMemo(() => {
+    if (days && days.length > 0) return days;
+    return generateCurrentWeekDays(completedDaysCount);
+  }, [days, completedDaysCount]);
+
   const completedCount =
-    completedDaysCount ?? days.filter(d => d.status === 'completed' || d.status === 'today').length;
+    completedDaysCount ?? activeDays.filter(d => d.status === 'completed' || d.status === 'today').length;
   const imageSource =
     typeof characterImageSource === 'string' ? { uri: characterImageSource } : characterImageSource;
 
   // Calculate active index for the timeline connecting path line
   const activeIndex = useMemo(() => {
-    const todayIdx = days.findIndex(d => d.isToday || d.status === 'today');
+    const todayIdx = activeDays.findIndex(d => d.isToday || d.status === 'today');
     if (todayIdx !== -1) return todayIdx;
-    for (let i = days.length - 1; i >= 0; i--) {
-      if (days[i].status === 'completed') return i;
+    for (let i = activeDays.length - 1; i >= 0; i--) {
+      if (activeDays[i].status === 'completed') return i;
     }
     return 0;
-  }, [days]);
+  }, [activeDays]);
 
-  const totalDays = days.length;
+  const totalDays = activeDays.length;
   const completedRatio = totalDays > 1 ? activeIndex / (totalDays - 1) : 0;
 
   // Animated moving path progress line
@@ -122,7 +152,7 @@ export function WeeklyTracker({
 
         {/* Days List */}
         <View style={styles.daysRow}>
-          {days.map((item, index) => {
+          {activeDays.map((item, index) => {
             const isToday = item.isToday || item.status === 'today';
             const isCompleted = item.status === 'completed';
 
@@ -181,6 +211,21 @@ export function WeeklyTracker({
         {/* Full-Height Right Overlay Character Image */}
         <View style={styles.characterImageWrapper} pointerEvents="none">
           <Image source={imageSource} style={styles.characterImage} resizeMode="cover" />
+          {/* Left-to-right gradient fade for seamless background integration */}
+          <LinearGradient
+            colors={['#141418', 'rgba(20, 20, 24, 0.75)', 'rgba(20, 20, 24, 0.2)', 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 0.75, y: 0.5 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          {/* Top and bottom edge soft fade */}
+          <LinearGradient
+            colors={['rgba(20, 20, 24, 0.6)', 'transparent', 'transparent', 'rgba(20, 20, 24, 0.7)']}
+            locations={[0, 0.2, 0.8, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
         </View>
 
         <View style={styles.bottomCardContent}>
@@ -579,10 +624,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    bottom: 24,
-    width: 115,
+    bottom: 0,
+    width: 140,
     zIndex: 0,
     overflow: 'hidden',
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
   },
   characterImage: {
     width: '100%',

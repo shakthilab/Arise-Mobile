@@ -27,6 +27,10 @@ type TimeOption = {
     value: string;
     unit: string;
     description: string;
+    // Canonical value the backend's protein-goal multiplier lookup expects —
+    // must be exactly "15min" | "30min" | "1hr" | "2hr_plus". Display-only
+    // label shown to the user (below) is derived separately and unaffected.
+    answer: string;
 };
 
 const TIME_OPTIONS: TimeOption[] = [
@@ -35,24 +39,28 @@ const TIME_OPTIONS: TimeOption[] = [
         value: '15',
         unit: 'MIN / DAY',
         description: 'Minimal commitment. Still lethal.',
+        answer: '15min',
     },
     {
         id: '30_min',
         value: '30',
         unit: 'MIN / DAY',
         description: 'Steady progress. Builds fast.',
+        answer: '30min',
     },
     {
         id: '1_hr',
         value: '1',
         unit: 'HR / DAY',
         description: 'Serious hunter. Strong returns.',
+        answer: '1hr',
     },
     {
         id: '2_plus_hr',
         value: '2+',
         unit: 'HR / DAY',
         description: 'Raid mode. Maximum evolution.',
+        answer: '2hr_plus',
     },
 ];
 
@@ -61,6 +69,7 @@ export default function TimeScreen() {
     const [selectedId, setSelectedId] = useState<string | null>(storeDailyTimeId);
     const setDailyTimeId = useOnboardingStore((s) => s.setDailyTimeId);
     const setDailyTimeLabel = useOnboardingStore((s) => s.setDailyTimeLabel);
+    const setDailyTimeAnswer = useOnboardingStore((s) => s.setDailyTimeAnswer);
 
     // Animations
     const headerAnim = useRef(new Animated.Value(0)).current;
@@ -110,6 +119,7 @@ export default function TimeScreen() {
         if (selected) {
             const label = `${selected.value}${selected.unit.includes('HR') ? 'h' : 'm'}`;
             setDailyTimeLabel(label);
+            setDailyTimeAnswer(selected.answer);
         }
         // Navigate to the oath screen (final onboarding step)
         router.push('/(onboarding)/oath');

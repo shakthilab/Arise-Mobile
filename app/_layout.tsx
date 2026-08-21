@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as WebBrowser from 'expo-web-browser';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   useFonts,
@@ -16,8 +17,13 @@ import {
 } from '@expo-google-fonts/inter';
 
 import { colors } from '@/theme/colors';
+import { useAuthStore } from '@/store/useAuthStore';
 
 SplashScreen.preventAutoHideAsync();
+
+// Lets the popup window opened for web Google sign-in (services/auth/googleAuthWeb)
+// signal completion back to the tab that opened it. No-op on native.
+WebBrowser.maybeCompleteAuthSession();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -29,6 +35,13 @@ export default function RootLayout() {
     Inter_600SemiBold_Italic,
     Inter_700Bold_Italic,
   });
+
+  // Runs once on app start — reads the persisted access token (if any) and
+  // fetches the user it belongs to, so a page refresh/relaunch stays logged
+  // in instead of bouncing to /login just because in-memory state reset.
+  useEffect(() => {
+    useAuthStore.getState().restoreSession();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {

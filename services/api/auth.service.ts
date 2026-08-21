@@ -12,6 +12,26 @@ type LoginResponse = {
   refresh_token?: string;
 };
 
+export function mapBackendUserToUser(u: any): User {
+  if (!u) return u;
+  const progression = u.user_progression || {};
+  const dailyStreak = u.currentStreak ?? progression.daily_streak ?? 0;
+  const weeklyStreak = u.weeklyStreak ?? progression.weekly_streak ?? (dailyStreak > 0 ? Math.min(dailyStreak, 7) : 0);
+  return {
+    ...u,
+    id: u.id ? u.id.toString() : '',
+    displayName: u.name || u.displayName || 'Hunter',
+    avatarUrl: u.avatarUrl || (u.avatar_id ? `char_${u.avatar_id}` : null),
+    level: u.level ?? progression.current_level ?? 1,
+    xp: u.xp ?? progression.total_xp ?? 0,
+    currentStreak: dailyStreak,
+    longestStreak: u.longestStreak ?? progression.longest_streak ?? 0,
+    weeklyStreak,
+    completedDaysCount: u.completedDaysCount ?? weeklyStreak,
+    user_progression: progression,
+  };
+}
+
 function extractErrorMessage(err: any): string {
   if (err?.response?.data) {
     const data = err.response.data;
@@ -41,7 +61,7 @@ export async function login(email: string, password: string): Promise<User> {
   }
 
   await tokenStorage.setTokens(accessToken, refreshToken);
-  return data.data.user;
+  return mapBackendUserToUser(data.data.user);
 }
 
 export type OnboardingAnswerPayload = {
@@ -67,7 +87,7 @@ export async function signup(payload: RegisterPayload): Promise<User> {
     if (accessToken && refreshToken) {
       await tokenStorage.setTokens(accessToken, refreshToken);
     }
-    return data?.data?.user || (data as any)?.user || ({ id: 'user_1', email: payload.email, displayName: payload.name } as User);
+    return mapBackendUserToUser(data?.data?.user || (data as any)?.user || { id: 'user_1', email: payload.email, name: payload.name });
   } catch (err: any) {
     const isNotFound = err?.response?.status === 404 || (err?.message && err.message.includes('404'));
     if (isNotFound) {
@@ -81,10 +101,10 @@ export async function signup(payload: RegisterPayload): Promise<User> {
         if (accessToken && refreshToken) {
           await tokenStorage.setTokens(accessToken, refreshToken);
         }
-        return data?.data?.user || (data as any)?.user || ({ id: 'user_1', email: payload.email, displayName: payload.name } as User);
+        return mapBackendUserToUser(data?.data?.user || (data as any)?.user || { id: 'user_1', email: payload.email, name: payload.name });
       } catch (innerErr: any) {
         if (innerErr?.response?.status === 404) {
-          return { id: 'user_1', email: payload.email, displayName: payload.name } as User;
+          return mapBackendUserToUser({ id: 'user_1', email: payload.email, name: payload.name });
         }
         throw new Error(extractErrorMessage(innerErr));
       }
@@ -93,8 +113,84 @@ export async function signup(payload: RegisterPayload): Promise<User> {
   }
 }
 
+export type GoogleLoginResult = {
+  user: User;
+  isNew: boolean;
+};
+
+type GoogleLoginResponse = LoginResponse & { isNew?: boolean };
+
+// Backend handles register-or-login in a single call (see HunterX-Backend
+// POST /api/auth/google) — same endpoint is used from both the Login and
+// Signup screens' "Continue with Google". onboarding[] only matters when
+// the account turns out to be brand new; an existing user just logs in.
+export async function loginWithGoogle(
+  idToken: string,
+  onboarding: OnboardingAnswerPayload[] = []
+): Promise<GoogleLoginResult> {
+  try {
+    const { data } = await apiClient.post<ApiResponse<GoogleLoginResponse>>('/auth/google', {
+      idToken,
+      onboarding,
+    });
+    if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+      throw new Error(data.error?.message || 'Google sign-in failed');
+    }
+    const accessToken = data?.data?.access_token || data?.data?.accessToken;
+    const refreshToken = data?.data?.refresh_token || data?.data?.refreshToken;
+    if (!accessToken || !refreshToken) {
+      throw new Error('Invalid token response from backend');
+    }
+    await tokenStorage.setTokens(accessToken, refreshToken);
+    return { user: mapBackendUserToUser(data.data.user), isNew: !!data.data.isNew };
+  } catch (err: any) {
+    const isNotFound = err?.response?.status === 404 || (err?.message && err.message.includes('404'));
+    if (isNotFound) {
+      const { data } = await apiClient.post<ApiResponse<GoogleLoginResponse>>('/api/auth/google', {
+        idToken,
+        onboarding,
+      });
+      if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+        throw new Error(data.error?.message || 'Google sign-in failed');
+      }
+      const accessToken = data?.data?.access_token || data?.data?.accessToken;
+      const refreshToken = data?.data?.refresh_token || data?.data?.refreshToken;
+      if (!accessToken || !refreshToken) {
+        throw new Error('Invalid token response from backend');
+      }
+      await tokenStorage.setTokens(accessToken, refreshToken);
+      return { user: mapBackendUserToUser(data.data.user), isNew: !!data.data.isNew };
+    }
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
 export async function logout(): Promise<void> {
   await tokenStorage.clearTokens();
+}
+
+// Restores a session on app start — apiClient already attaches the stored
+// access token (and transparently refreshes it on a 401), so this just
+// confirms it's still valid and fetches the user it belongs to.
+export async function getCurrentUser(): Promise<User> {
+  const { data } = await apiClient.get<ApiResponse<{ user: User }>>('/auth/me');
+  if (!data.success) throw new Error(data.error.message);
+  return mapBackendUserToUser(data.data.user);
+}
+
+// For an already-authenticated user whose onboarding isn't done yet — e.g.
+// a Google account created straight from the Login screen, before the
+// onboarding wizard ran. Attaches the wizard's answers to that account
+// (POST /api/auth/complete-onboarding) instead of creating a new one.
+export async function completeOnboarding(
+  onboarding: OnboardingAnswerPayload[]
+): Promise<User> {
+  const { data } = await apiClient.post<ApiResponse<{ user: User }>>(
+    '/auth/complete-onboarding',
+    { onboarding }
+  );
+  if (!data.success) throw new Error(data.error.message);
+  return mapBackendUserToUser(data.data.user);
 }
 
 export async function sendOtp(email: string): Promise<string> {

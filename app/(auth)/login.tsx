@@ -20,15 +20,17 @@ import { Button } from '@/components/common/Button';
 import { DustParticles } from '@/components/common/DustParticles';
 import { GoogleIcon } from '@/components/common/GoogleIcon';
 import { useAuth } from '@/hooks/useAuth';
+import { isGoogleSignInCancelled, signInWithGoogle } from '@/services/auth/googleAuth';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
 export default function LoginScreen() {
-  const { login, isAuthenticating } = useAuth();
+  const { login, loginWithGoogle, isAuthenticating } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const [focusedInput, setFocusedInput] = useState<'email' | 'password' | null>(null);
 
@@ -89,8 +91,24 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    // Placeholder for Google OAuth
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setIsGoogleLoading(true);
+    try {
+      const idToken = await signInWithGoogle();
+      // Login screen never has onboarding answers to attach — the account
+      // gets created with placeholders, then a brand new user is sent
+      // through the full wizard, which attaches their real answers to this
+      // same account at the end (see oath.tsx's isAuthenticated branch).
+      const { isNew } = await loginWithGoogle(idToken);
+      router.replace(isNew ? '/(onboarding)/name' : '/(tabs)');
+    } catch (err) {
+      if (!isGoogleSignInCancelled(err)) {
+        setError(err instanceof Error ? err.message : 'Google sign-in failed');
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
   const handleAppleLogin = () => {
@@ -220,6 +238,7 @@ export default function LoginScreen() {
                 label="CONTINUE"
                 onPress={handleLogin}
                 loading={isAuthenticating}
+                disabled={isGoogleLoading}
                 variant="primary"
                 style={styles.continueButton}
                 labelStyle={styles.continueButtonLabel}
@@ -238,6 +257,8 @@ export default function LoginScreen() {
               <Button
                 label="Continue with Google"
                 onPress={handleGoogleLogin}
+                loading={isGoogleLoading}
+                disabled={isAuthenticating}
                 variant="outline"
                 icon={<GoogleIcon size={18} />}
                 style={styles.socialButton}
