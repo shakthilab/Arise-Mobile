@@ -1,15 +1,24 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { colors } from '@/theme/colors';
+
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.tabBar,
+        // Bar height + bottom padding grow with the device's own inset so the
+        // bar's background actually reaches the bottom edge (home indicator /
+        // gesture bar area) instead of leaving a gap that falls back to the
+        // default system black there.
+        tabBarStyle: [styles.tabBar, { height: 64 + insets.bottom, paddingBottom: 8 + insets.bottom }],
       }}
     >
       <Tabs.Screen
@@ -62,12 +71,10 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#09090B',
+    backgroundColor: colors.background,
     borderTopColor: '#18181B',
     borderTopWidth: 1,
-    height: 64,
     paddingTop: 8,
-    paddingBottom: 8,
   },
   iconContainer: {
     width: 44,

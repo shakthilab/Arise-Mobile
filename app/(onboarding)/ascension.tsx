@@ -18,6 +18,7 @@ import { DustParticles } from '@/components/common/DustParticles';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { useAuth } from '@/hooks/useAuth';
+import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 
 export default function AscensionScreen() {
   const { completeOnboarding } = useAuth();
@@ -53,7 +54,7 @@ export default function AscensionScreen() {
         {/* Top Hero Image Banner */}
         <View style={styles.heroWrapper}>
           <ImageBackground
-            source={require('@/assets/images/screen.png')}
+            source={CLOUDINARY_ASSETS.screen}
             style={styles.heroImage}
             resizeMode="cover"
           >

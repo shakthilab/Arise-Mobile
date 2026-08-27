@@ -22,6 +22,7 @@ import { DustParticles } from '@/components/common/DustParticles';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 import { forgotPassword } from '@/services/api/auth.service';
+import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 
 const HERO_ASPECT_RATIO = 1264 / 848; // image height / image width
 const HERO_TOP_OFFSET = 55;
@@ -143,7 +144,7 @@ export default function ForgotPasswordScreen() {
       {/* Background Image Container */}
       <View style={styles.heroBackground}>
         <Image
-          source={require('@/assets/images/lost_access_bg.png')}
+          source={CLOUDINARY_ASSETS.lost_access_bg}
           style={styles.heroImage}
         />
 

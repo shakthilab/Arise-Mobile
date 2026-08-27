@@ -2,7 +2,7 @@
   "expo": {
     "name": "HunterX",
     "slug": "shakthi",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hunterx",
@@ -16,12 +16,14 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.hunterx.mobile",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.hunterx.mobile",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0A0E17",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

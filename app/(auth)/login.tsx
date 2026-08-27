@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { isGoogleSignInCancelled, signInWithGoogle } from '@/services/auth/googleAuth';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
+import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 
 export default function LoginScreen() {
   const { login, loginWithGoogle, isAuthenticating } = useAuth();
@@ -132,7 +133,7 @@ export default function LoginScreen() {
         >
           {/* Hero Banner Header */}
           <ImageBackground
-            source={require('@/assets/images/login_bg.png')}
+            source={CLOUDINARY_ASSETS.login_bg}
             style={styles.heroBackground}
             resizeMode="cover"
           >

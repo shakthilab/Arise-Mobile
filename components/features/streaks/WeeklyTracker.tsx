@@ -4,6 +4,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { fontFamilies } from '@/theme/typography';
+import { getAvatarSource } from '@/app/(tabs)/profile';
+import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 
 export interface DayTrackerItem {
   dayName: string;
@@ -19,6 +21,7 @@ interface WeeklyTrackerProps {
   totalDaysCount?: number;
   subtitleMessage?: string;
   characterImageSource?: any;
+  avatarUrl?: string | null;
   onDayPress?: (day: DayTrackerItem) => void;
 }
 
@@ -57,7 +60,7 @@ export function generateCurrentWeekDays(completedCount?: number): DayTrackerItem
   });
 }
 
-const DEFAULT_CHARACTER_IMAGE = require('@/assets/images/high_fidelity.png');
+const DEFAULT_CHARACTER_IMAGE = CLOUDINARY_ASSETS.high_fidelity;
 
 export function WeeklyTracker({
   days,
@@ -66,6 +69,7 @@ export function WeeklyTracker({
   totalDaysCount = 7,
   subtitleMessage = 'Track your progress. Consistency builds legends.',
   characterImageSource = DEFAULT_CHARACTER_IMAGE,
+  avatarUrl,
   onDayPress,
 }: WeeklyTrackerProps) {
   const activeDays = useMemo(() => {
@@ -254,6 +258,7 @@ export function WeeklyTracker({
                   transform="rotate(-90 25 25)"
                 />
               </Svg>
+              <Image source={getAvatarSource(avatarUrl)} style={styles.avatarInsideRing} />
             </View>
 
             <View style={styles.progressTextColumn}>
@@ -564,6 +569,17 @@ const styles = StyleSheet.create({
   },
   ringWrapper: {
     marginRight: 10,
+    position: 'relative',
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInsideRing: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   progressTextColumn: {
     justifyContent: 'center',

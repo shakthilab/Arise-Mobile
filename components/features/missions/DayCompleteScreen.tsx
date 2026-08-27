@@ -1,25 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
-  Image,
   ImageBackground,
   Modal,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Asset } from 'expo-asset';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
-  interpolate,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -30,8 +25,11 @@ import Animated, {
 
 import { QuestItem } from '@/app/(tabs)/index';
 import { fontFamilies } from '@/theme/typography';
+import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const CONTENT_DELAY = 450;
 
 // 20 Looping Ember particles for background ambient effect
 const PARTICLE_COUNT = 18;
@@ -103,6 +101,62 @@ function EmberParticle({
   );
 }
 
+interface TaskRowAnimatedProps {
+  quest: QuestItem;
+  index: number;
+}
+
+function TaskRowAnimated({ quest, index }: TaskRowAnimatedProps) {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(16);
+
+  useEffect(() => {
+    const delayTime = CONTENT_DELAY + 150 + index * 40;
+    opacity.value = withDelay(
+      delayTime,
+      withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) })
+    );
+    translateY.value = withDelay(
+      delayTime,
+      withTiming(0, { duration: 200, easing: Easing.out(Easing.back(1)) })
+    );
+  }, [index]);
+
+  const rowStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const isCompleted = quest.status === 'done' || quest.status === 'partial';
+
+  return (
+    <Animated.View style={[styles.taskRow, rowStyle]}>
+      <View style={styles.rowLeftGroup}>
+        {isCompleted ? (
+          <View style={styles.checkIconCircle}>
+            <Ionicons name="checkmark" size={12} color="#FFA726" />
+          </View>
+        ) : (
+          <View style={styles.pendingIconSquare}>
+            <Ionicons name="square-outline" size={13} color="#FFA726" />
+          </View>
+        )}
+        <View style={styles.verticalDivider} />
+        <Text style={styles.taskTitleText} numberOfLines={1}>
+          {quest.title}
+        </Text>
+      </View>
+
+      <View style={styles.rowRightGroup}>
+        <Text style={styles.taskXpText}>
+          +{quest.earnedXp ?? quest.xpReward} XP
+        </Text>
+        <Ionicons name="chevron-forward" size={14} color="#666666" />
+      </View>
+    </Animated.View>
+  );
+}
+
 export interface DayCompleteScreenProps {
   quests: QuestItem[];
   onContinue: () => void;
@@ -135,12 +189,6 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
   // XP Ticking Counter state
   const [displayedXp, setDisplayedXp] = useState(0);
 
-  // Staggered Row SharedValues
-  const rowAnimValues = questsToDisplay.map(() => ({
-    opacity: useSharedValue(0),
-    translateY: useSharedValue(16),
-  }));
-
   // Date formatting
   const dateFormatted = React.useMemo(() => {
     const now = new Date();
@@ -168,9 +216,6 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
     screenFade.value = withTiming(1, { duration: 150 });
     heroOpacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.quad) });
     heroScale.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) });
-
-    // 2. FAST CONTENT REVEAL (450ms delay)
-    const CONTENT_DELAY = 450;
 
     // Headline block slide up + fade in
     headlineOpacity.value = withDelay(
@@ -212,19 +257,6 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
     };
 
     const xpTimer = setTimeout(startXpTick, CONTENT_DELAY + 100);
-
-    // Fast Staggered Row entrance
-    rowAnimValues.forEach((anim, idx) => {
-      const delayTime = CONTENT_DELAY + 150 + idx * 40;
-      anim.opacity.value = withDelay(
-        delayTime,
-        withTiming(1, { duration: 200, easing: Easing.out(Easing.quad) })
-      );
-      anim.translateY.value = withDelay(
-        delayTime,
-        withTiming(0, { duration: 200, easing: Easing.out(Easing.back(1)) })
-      );
-    });
 
     // 2 small buttons spring entrance animations
     const buttonDelay = CONTENT_DELAY + 150 + questsToDisplay.length * 40 + 40;
@@ -277,11 +309,6 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
     opacity: screenFade.value,
   }));
 
-  const heroAnimStyle = useAnimatedStyle(() => ({
-    opacity: heroOpacity.value,
-    transform: [{ scale: heroScale.value }],
-  }));
-
   const headlineAnimStyle = useAnimatedStyle(() => ({
     opacity: headlineOpacity.value,
     transform: [{ translateY: headlineTranslateY.value }],
@@ -292,40 +319,14 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
     transform: [{ translateY: cardTranslateY.value }],
   }));
 
-  const getTaskIcon = (quest: QuestItem) => {
-    const titleLower = quest.title.toLowerCase();
-    const catLower = quest.category.toLowerCase();
+  const continueAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: continueScale.value }],
+  }));
 
-    if (
-      titleLower.includes('wake') ||
-      titleLower.includes('sleep') ||
-      catLower.includes('rest')
-    ) {
-      return <Ionicons name="sunny" size={18} color="#FFA726" />;
-    }
-    if (
-      titleLower.includes('water') ||
-      titleLower.includes('drink') ||
-      catLower.includes('hydrate')
-    ) {
-      return <Ionicons name="water" size={18} color="#60A5FA" />;
-    }
-    if (
-      titleLower.includes('protein') ||
-      titleLower.includes('food') ||
-      catLower.includes('nutrition')
-    ) {
-      return <Ionicons name="restaurant" size={16} color="#EF4444" />;
-    }
-    if (
-      titleLower.includes('run') ||
-      titleLower.includes('walk') ||
-      catLower.includes('cardio')
-    ) {
-      return <Ionicons name="fitness" size={18} color="#34D399" />;
-    }
-    return <Ionicons name="sparkles" size={18} color="#FFA726" />;
-  };
+  const shareAnimStyle = useAnimatedStyle(() => ({
+    opacity: shareOpacity.value,
+    transform: [{ scale: shareScale.value }],
+  }));
 
   return (
     <Modal
@@ -349,8 +350,8 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
 
         {/* FULL BLEED ANIME BACKGROUND IMAGE */}
         <ImageBackground
-          source={require('@/assets/images/popupsavatar.jpg')}
-          defaultSource={require('@/assets/images/active_campaign_bg.jpg')}
+          source={CLOUDINARY_ASSETS.popupsavatar}
+          defaultSource={CLOUDINARY_ASSETS.active_campaign_bg}
           style={StyleSheet.absoluteFillObject}
           resizeMode="cover"
         >
@@ -369,6 +370,14 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
 
         {/* CENTER FLOATING CONTENT AREA */}
         <View style={styles.centerContainer}>
+          {/* Headline Block (Animate entrance and display ticking XP) */}
+          <Animated.View style={[styles.headlineBlock, headlineAnimStyle]}>
+            <Text style={styles.headlineTitle}>MISSION CLEAR</Text>
+            <Text style={styles.headlineSubtext}>
+              YOU EARNED <Text style={styles.amberXpHighlight}>+{displayedXp} XP</Text> TODAY
+            </Text>
+          </Animated.View>
+
           <Animated.View style={[styles.centerCard, cardAnimStyle]}>
             {/* Card Header Info Row */}
             <View style={styles.cardHeaderRow}>
@@ -410,42 +419,13 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
 
             {/* Staggered Task Rows List */}
             <View style={styles.taskListContainer}>
-              {questsToDisplay.map((quest, idx) => {
-                const isCompleted = quest.status === 'done' || quest.status === 'partial';
-                const rowStyle = useAnimatedStyle(() => ({
-                  opacity: rowAnimValues[idx]?.opacity.value ?? 1,
-                  transform: [
-                    { translateY: rowAnimValues[idx]?.translateY.value ?? 0 },
-                  ],
-                }));
-
-                return (
-                  <Animated.View key={quest.id} style={[styles.taskRow, rowStyle]}>
-                    <View style={styles.rowLeftGroup}>
-                      {isCompleted ? (
-                        <View style={styles.checkIconCircle}>
-                          <Ionicons name="checkmark" size={12} color="#FFA726" />
-                        </View>
-                      ) : (
-                        <View style={styles.pendingIconSquare}>
-                          <Ionicons name="square-outline" size={13} color="#FFA726" />
-                        </View>
-                      )}
-                      <View style={styles.verticalDivider} />
-                      <Text style={styles.taskTitleText} numberOfLines={1}>
-                        {quest.title}
-                      </Text>
-                    </View>
-
-                    <View style={styles.rowRightGroup}>
-                      <Text style={styles.taskXpText}>
-                        +{quest.earnedXp ?? quest.xpReward} XP
-                      </Text>
-                      <Ionicons name="chevron-forward" size={14} color="#666666" />
-                    </View>
-                  </Animated.View>
-                );
-              })}
+              {questsToDisplay.map((quest, idx) => (
+                <TaskRowAnimated
+                  key={quest.id}
+                  quest={quest}
+                  index={idx}
+                />
+              ))}
             </View>
           </Animated.View>
         </View>
@@ -453,8 +433,8 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
         {/* BOTTOM ACTION ROW — TWO ANIMATED BUTTONS */}
         <View style={styles.bottomActionsRowContainer}>
           <View style={styles.bottomActionsRow}>
-            {/* CONTINUE BUTTON (Primary - Static) */}
-            <View style={{ flex: 1 }}>
+            {/* CONTINUE BUTTON (Primary - Animated) */}
+            <Animated.View style={[{ flex: 1 }, continueAnimStyle]}>
               <Pressable
                 style={styles.primaryContinueBtn}
                 onPress={handleContinuePress}
@@ -462,10 +442,10 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
                 <Text style={styles.primaryContinueText}>CONTINUE</Text>
                 <Ionicons name="arrow-forward" size={16} color="#0A0A0A" />
               </Pressable>
-            </View>
+            </Animated.View>
 
-            {/* SHARE BUTTON (Secondary - Static) */}
-            <View style={{ flex: 1 }}>
+            {/* SHARE BUTTON (Secondary - Animated) */}
+            <Animated.View style={[{ flex: 1 }, shareAnimStyle]}>
               <Pressable
                 style={styles.secondaryShareBtn}
                 onPress={handleSharePress}
@@ -473,13 +453,14 @@ export function DayCompleteScreen({ quests, onContinue }: DayCompleteScreenProps
                 <Ionicons name="share-outline" size={16} color="#FFA726" />
                 <Text style={styles.secondaryShareText}>SHARE</Text>
               </Pressable>
-            </View>
+            </Animated.View>
           </View>
         </View>
       </Animated.View>
     </Modal>
   );
 }
+
 
 const styles = StyleSheet.create({
   screenContainer: {

@@ -1,42 +1,37 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 
 export default function LeaderboardScreen() {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <LinearGradient
-          colors={['#0D0D11', '#070709', '#030304']}
-          style={StyleSheet.absoluteFillObject}
-        />
+    <Screen style={styles.container}>
+      <LinearGradient
+        colors={['#0D0D11', '#070709', '#030304']}
+        style={StyleSheet.absoluteFillObject}
+      />
 
-        <View style={styles.headerBar}>
-          <Text style={styles.title}>HUNTER ARENA</Text>
-          <Text style={styles.subtitle}>GLOBAL LEADERBOARD</Text>
-        </View>
-
-        <View style={styles.emptyContent}>
-          <Text style={styles.emptyText}>Leaderboard Coming Soon</Text>
-        </View>
+      <View style={styles.headerBar}>
+        <Text style={styles.title}>HUNTER ARENA</Text>
+        <Text style={styles.subtitle}>GLOBAL LEADERBOARD</Text>
       </View>
-    </SafeAreaView>
+
+      <View style={styles.emptyContent}>
+        <Text style={styles.emptyText}>Leaderboard Coming Soon</Text>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#070709',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#070709',
   },
   headerBar: {
     paddingHorizontal: 20,
-    paddingTop: 56,
+    paddingTop: 12,
     paddingBottom: 12,
   },
   title: {

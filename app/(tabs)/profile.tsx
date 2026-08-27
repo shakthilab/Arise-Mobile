@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Alert,
+  Animated,
+  Clipboard,
   Dimensions,
   Image,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -18,12 +21,18 @@ import {
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
+import { Asset } from 'expo-asset';
+import ViewShot from '@/components/common/ViewShotCompat';
+import RNShare from '@/services/share/RNShare';
 
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Screen } from '@/components/common/Screen';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fontFamilies } from '@/theme/typography';
+import type { ViewShotHandle } from '@/types/viewShot';
+import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -46,52 +55,84 @@ export interface RecentActivityItem {
 
 const GAMIFIED_ANIME_AVATARS: AnimeAvatarItem[] = [
   {
-    id: 'naruto',
-    name: 'Naruto Uzumaki',
-    tag: 'HIDDEN LEAF NINJA',
+    id: 'arise_1',
+    name: 'Shadow Hunter I',
+    tag: 'S-RANK HUNTER',
     rarity: 'LEGENDARY',
-    assetKey: 'char_naruto',
-    source: require('@/assets/images/naruto.jpg'),
+    assetKey: 'arise_1',
+    source: CLOUDINARY_ASSETS.arise_avatar_1,
   },
   {
-    id: 'luffy',
-    name: 'Monkey D. Luffy',
-    tag: 'STRAW HAT CAPTAIN',
+    id: 'arise_2',
+    name: 'Shadow Hunter II',
+    tag: 'S-RANK HUNTER',
     rarity: 'LEGENDARY',
-    assetKey: 'char_luffy',
-    source: require('@/assets/images/luffy.jpg'),
+    assetKey: 'arise_2',
+    source: CLOUDINARY_ASSETS.arise_avatar_2,
   },
   {
-    id: 'gojo',
-    name: 'Satoru Gojo',
-    tag: 'SIX EYES SORCERER',
+    id: 'arise_3',
+    name: 'Shadow Hunter III',
+    tag: 'S-RANK HUNTER',
     rarity: 'LEGENDARY',
-    assetKey: 'char_gojo',
-    source: require('@/assets/images/gojo.jpg'),
+    assetKey: 'arise_3',
+    source: CLOUDINARY_ASSETS.arise_avatar_3,
   },
   {
-    id: 'itachi',
-    name: 'Itachi Uchiha',
-    tag: 'SHARINGAN MASTER',
+    id: 'arise_4',
+    name: 'Shadow Hunter IV',
+    tag: 'S-RANK HUNTER',
     rarity: 'LEGENDARY',
-    assetKey: 'char_itachi',
-    source: require('@/assets/images/itachi.jpg'),
+    assetKey: 'arise_4',
+    source: CLOUDINARY_ASSETS.arise_avatar_4,
   },
   {
-    id: 'goku',
-    name: 'Son Goku',
-    tag: 'SUPER SAIYAN WARRIOR',
+    id: 'arise_5',
+    name: 'Shadow Hunter V',
+    tag: 'S-RANK HUNTER',
     rarity: 'LEGENDARY',
-    assetKey: 'char_goku',
-    source: require('@/assets/images/goku.jpg'),
+    assetKey: 'arise_5',
+    source: CLOUDINARY_ASSETS.arise_avatar_5,
   },
   {
-    id: 'jinwoo',
-    name: 'Sung Jin-Woo',
-    tag: 'SHADOW MONARCH',
+    id: 'arise_6',
+    name: 'Shadow Hunter VI',
+    tag: 'S-RANK HUNTER',
     rarity: 'LEGENDARY',
-    assetKey: 'char_jinwoo',
-    source: require('@/assets/images/jinwoo.jpg'),
+    assetKey: 'arise_6',
+    source: CLOUDINARY_ASSETS.arise_avatar_6,
+  },
+  {
+    id: 'arise_7',
+    name: 'Shadow Hunter VII',
+    tag: 'S-RANK HUNTER',
+    rarity: 'LEGENDARY',
+    assetKey: 'arise_7',
+    source: CLOUDINARY_ASSETS.arise_avatar_7,
+  },
+  {
+    id: 'arise_8',
+    name: 'Shadow Hunter VIII',
+    tag: 'S-RANK HUNTER',
+    rarity: 'LEGENDARY',
+    assetKey: 'arise_8',
+    source: CLOUDINARY_ASSETS.arise_avatar_8,
+  },
+  {
+    id: 'arise_9',
+    name: 'Shadow Hunter IX',
+    tag: 'S-RANK HUNTER',
+    rarity: 'LEGENDARY',
+    assetKey: 'arise_9',
+    source: CLOUDINARY_ASSETS.arise_avatar_9,
+  },
+  {
+    id: 'arise_10',
+    name: 'Shadow Hunter X',
+    tag: 'S-RANK HUNTER',
+    rarity: 'LEGENDARY',
+    assetKey: 'arise_10',
+    source: CLOUDINARY_ASSETS.arise_avatar_10,
   },
 ];
 
@@ -112,23 +153,36 @@ const YEARS_LIST = Array.from({ length: 81 }, (_, i) => 1950 + i);
 
 export const getAvatarSource = (avatarUrl: string | null | undefined) => {
   if (!avatarUrl || avatarUrl === 'char_naruto' || avatarUrl === 'naruto.jpg') {
-    return require('@/assets/images/naruto.jpg');
+    return CLOUDINARY_ASSETS.arise_avatar_2;
   }
   if (avatarUrl === 'char_luffy' || avatarUrl === 'luffy.jpg') {
-    return require('@/assets/images/luffy.jpg');
+    return CLOUDINARY_ASSETS.arise_avatar_2;
   }
   if (avatarUrl === 'char_gojo' || avatarUrl === 'gojo.jpg') {
-    return require('@/assets/images/gojo.jpg');
+    return CLOUDINARY_ASSETS.arise_avatar_3;
   }
   if (avatarUrl === 'char_itachi' || avatarUrl === 'itachi.jpg') {
-    return require('@/assets/images/itachi.jpg');
+    return CLOUDINARY_ASSETS.arise_avatar_4;
   }
   if (avatarUrl === 'char_goku' || avatarUrl === 'goku.jpg') {
-    return require('@/assets/images/goku.jpg');
+    return CLOUDINARY_ASSETS.arise_avatar_5;
   }
   if (avatarUrl === 'char_jinwoo' || avatarUrl === 'jinwoo.jpg') {
-    return require('@/assets/images/jinwoo.jpg');
+    return CLOUDINARY_ASSETS.arise_avatar_6;
   }
+
+  // Custom arise keys
+  if (avatarUrl === 'arise_1') return CLOUDINARY_ASSETS.arise_avatar_1;
+  if (avatarUrl === 'arise_2') return CLOUDINARY_ASSETS.arise_avatar_2;
+  if (avatarUrl === 'arise_3') return CLOUDINARY_ASSETS.arise_avatar_3;
+  if (avatarUrl === 'arise_4') return CLOUDINARY_ASSETS.arise_avatar_4;
+  if (avatarUrl === 'arise_5') return CLOUDINARY_ASSETS.arise_avatar_5;
+  if (avatarUrl === 'arise_6') return CLOUDINARY_ASSETS.arise_avatar_6;
+  if (avatarUrl === 'arise_7') return CLOUDINARY_ASSETS.arise_avatar_7;
+  if (avatarUrl === 'arise_8') return CLOUDINARY_ASSETS.arise_avatar_8;
+  if (avatarUrl === 'arise_9') return CLOUDINARY_ASSETS.arise_avatar_9;
+  if (avatarUrl === 'arise_10') return CLOUDINARY_ASSETS.arise_avatar_10;
+
   const found = GAMIFIED_ANIME_AVATARS.find(
     (a) => a.assetKey === avatarUrl || a.id === avatarUrl
   );
@@ -136,7 +190,7 @@ export const getAvatarSource = (avatarUrl: string | null | undefined) => {
   if (typeof avatarUrl === 'string' && avatarUrl.startsWith('http')) {
     return { uri: avatarUrl };
   }
-  return require('@/assets/images/naruto.jpg');
+  return CLOUDINARY_ASSETS.arise_avatar_2;
 };
 
 export default function ProfileScreen() {
@@ -149,22 +203,147 @@ export default function ProfileScreen() {
   const [isEditNameModalVisible, setIsEditNameModalVisible] = useState(false);
   const [editedName, setEditedName] = useState(userAny?.name ?? user?.displayName ?? 'Seymen');
 
-  // Full Edit Profile Modal State
   const [isEditProfileModalVisible, setIsEditProfileModalVisible] = useState(false);
+  const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({
     name: userAny?.name ?? user?.displayName ?? 'Seymen',
     gender: userAny?.gender ? (userAny.gender === 'MALE' ? 'Male' : userAny.gender === 'FEMALE' ? 'Female' : userAny.gender) : 'Male',
-    birthday: userAny?.date_of_birth ? '07/08/02' : '15/08/03',
-    units: 'cm/kg',
-    height: userAny?.height_cm ? `${userAny.height_cm} cm` : '181 cm',
-    weight: userAny?.weight_kg ? `${userAny.weight_kg} kg` : '75.0 kg',
+    birthday: userAny?.date_of_birth ? userAny.date_of_birth : '15/08/03',
+    height: userAny?.height_cm ? String(userAny.height_cm) : '181',
+    weight: userAny?.weight_kg ? String(userAny.weight_kg) : '75.0',
+    heightUnit: userAny?.height_unit ?? 'cm',
+    weightUnit: userAny?.weight_unit ?? 'kg',
+    protein: user?.daily_protein_goal ? String(user.daily_protein_goal) : '140',
   });
+
+  useEffect(() => {
+    if (isEditProfileModalVisible && user) {
+      const uAny = user as any;
+      const hUnit = uAny?.height_unit ?? 'cm';
+      const wUnit = uAny?.weight_unit ?? 'kg';
+
+      const hVal = uAny?.height_cm
+        ? (hUnit === 'ft' ? (uAny.height_cm * 0.0328084).toFixed(1) : String(uAny.height_cm))
+        : '181';
+
+      const wVal = uAny?.weight_kg
+        ? (wUnit === 'lbs' ? (uAny.weight_kg * 2.20462).toFixed(1) : String(uAny.weight_kg))
+        : '75';
+
+      setProfileForm({
+        name: uAny?.name ?? user?.displayName ?? 'Seymen',
+        gender: uAny?.gender ? (uAny.gender === 'MALE' ? 'Male' : uAny.gender === 'FEMALE' ? 'Female' : uAny.gender) : 'Male',
+        birthday: uAny?.date_of_birth ? uAny.date_of_birth : '15/08/03',
+        height: hVal,
+        weight: wVal,
+        heightUnit: hUnit,
+        weightUnit: wUnit,
+        protein: user?.daily_protein_goal ? String(user.daily_protein_goal) : '140',
+      });
+      setIsGenderDropdownOpen(false);
+    }
+  }, [isEditProfileModalVisible, user]);
 
   // Invite Friends Modal State
   const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const referralCode = userAny?.referral_code ?? '45JLFI17';
   const referralLink = `https://join.hunterx.app/guestpass/${referralCode}`;
+  const guestPassCardRef = useRef<ViewShotHandle>(null);
+
+  // Scan Line Animation Value for guest pass card
+  const scanAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let animation: any = null;
+
+    const startScanAnimation = () => {
+      scanAnim.setValue(0);
+      animation = Animated.sequence([
+        Animated.timing(scanAnim, {
+          toValue: 115, // middle of 230 height
+          duration: 2200, // 2.2 seconds
+          useNativeDriver: true,
+        }),
+        Animated.delay(600), // brief pause before reset
+      ]);
+      animation.start((result: any) => {
+        if (result?.finished) {
+          startScanAnimation();
+        }
+      });
+    };
+
+    if (isInviteModalVisible) {
+      startScanAnimation();
+    } else {
+      scanAnim.setValue(0);
+      if (animation) {
+        animation.stop();
+      }
+    }
+
+    return () => {
+      if (animation) {
+        animation.stop();
+      }
+    };
+  }, [isInviteModalVisible, scanAnim]);
+
+  // Glow Pulse Animation Value
+  const glowAnim = useRef(new Animated.Value(0.25)).current;
+
+  useEffect(() => {
+    let animation: any = null;
+
+    const startGlowAnimation = () => {
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 0.55, // mild brighter state
+            duration: 2200, // smooth breathing cycle
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.25, // mild dimmer state
+            duration: 2200,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+    };
+
+    if (isInviteModalVisible) {
+      startGlowAnimation();
+    } else {
+      glowAnim.setValue(0.25);
+      if (animation) {
+        animation.stop();
+      }
+    }
+
+    return () => {
+      if (animation) {
+        animation.stop();
+      }
+    };
+  }, [isInviteModalVisible, glowAnim]);
+
+  useEffect(() => {
+    if (userAny?.delete_at) {
+      const checkDeletion = () => {
+        const remainingMs = userAny.delete_at - Date.now();
+        if (remainingMs <= 0) {
+          logout();
+          router.replace('/(auth)/login');
+        }
+      };
+      checkDeletion();
+      const interval = setInterval(checkDeletion, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [userAny?.delete_at]);
 
   // Calendar Date Picker Modal State
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
@@ -179,8 +358,7 @@ export default function ProfileScreen() {
   // Recent Activity Modal State
   const [isRecentActivityModalVisible, setIsRecentActivityModalVisible] = useState(false);
 
-  // My Goals Modal State
-  const [isGoalsModalVisible, setIsGoalsModalVisible] = useState(false);
+
 
   // Rate HunterX Modal State
   const [isRateModalVisible, setIsRateModalVisible] = useState(false);
@@ -223,7 +401,39 @@ export default function ProfileScreen() {
 
   const handleSaveProfileForm = () => {
     if (user && profileForm.name.trim()) {
-      setUser({ ...user, displayName: profileForm.name.trim() });
+      let heightInCm = 181;
+      const heightVal = parseFloat(profileForm.height);
+      if (!isNaN(heightVal)) {
+        if (profileForm.heightUnit === 'ft') {
+          heightInCm = Math.round(heightVal / 0.0328084);
+        } else {
+          heightInCm = Math.round(heightVal);
+        }
+      }
+
+      let weightInKg = 75;
+      const weightVal = parseFloat(profileForm.weight);
+      if (!isNaN(weightVal)) {
+        if (profileForm.weightUnit === 'lbs') {
+          weightInKg = parseFloat((weightVal / 2.20462).toFixed(1));
+        } else {
+          weightInKg = parseFloat(weightVal.toFixed(1));
+        }
+      }
+
+      const updatedUser = {
+        ...user,
+        displayName: profileForm.name.trim(),
+        gender: profileForm.gender.toUpperCase() === 'MALE' ? 'MALE' : profileForm.gender.toUpperCase() === 'FEMALE' ? 'FEMALE' : 'OTHER',
+        date_of_birth: profileForm.birthday,
+        height_cm: heightInCm,
+        weight_kg: weightInKg,
+        height_unit: profileForm.heightUnit,
+        weight_unit: profileForm.weightUnit,
+        daily_protein_goal: profileForm.protein ? parseInt(profileForm.protein, 10) : null,
+      };
+
+      setUser(updatedUser);
     }
     setIsEditProfileModalVisible(false);
     Alert.alert('Profile Saved', 'Your profile details have been updated successfully!');
@@ -245,28 +455,66 @@ export default function ProfileScreen() {
 
   const handleCopyLink = () => {
     setIsCopied(true);
+    Clipboard.setString(referralLink);
     Alert.alert('Link Copied!', 'Your unique referral link has been copied to clipboard.');
     setTimeout(() => setIsCopied(false), 3000);
   };
 
   const handleSendInvitation = async () => {
+    const shareMessage = `Claim a free week of HunterX with my Guest Pass! Use code: ${referralCode}\n\nJoin here: ${referralLink}`;
+
     try {
-      await Share.share({
-        message: `Claim a free week of HunterX with my Guest Pass! ${referralLink}`,
-        url: referralLink,
+      // Snapshot the Guest Pass card so it goes out as an image alongside the text + link.
+      const cardImageUri = await guestPassCardRef.current?.capture?.();
+
+      await RNShare.open({
         title: 'HunterX Guest Pass',
+        message: shareMessage,
+        url: cardImageUri,
+        failOnCancel: false,
       });
-    } catch (error) {
-      console.log('Error sharing invitation:', error);
+    } catch (error: any) {
+      // User dismissing the share sheet also lands here on some platforms - don't treat it as a failure.
+      if (error?.message === 'User did not share') return;
+
+      console.log('Error sharing invitation, falling back to text-only share:', error);
+      try {
+        await Share.share({
+          message: shareMessage,
+          title: 'HunterX Guest Pass',
+        });
+      } catch (fallbackError) {
+        console.log('Fallback share also failed:', fallbackError);
+      }
     }
   };
 
-  const handleDeleteAccount = () => setIsDeleteConfirmVisible(true);
+  const handleDeleteAccount = () => {
+    setIsEditProfileModalVisible(false);
+    setTimeout(() => {
+      setIsDeleteConfirmVisible(true);
+    }, 400);
+  };
 
   const confirmDeleteAccount = async () => {
     setIsDeleteConfirmVisible(false);
-    await logout();
-    router.replace('/(auth)/login');
+    if (user) {
+      const deleteTime = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      setUser({ ...user, delete_at: deleteTime } as any);
+      Alert.alert(
+        'Account Scheduled for Deletion',
+        'You have 7 days to retrieve your account. After 7 days, your account will be fully deleted.'
+      );
+    }
+  };
+
+  const handleCancelDeletion = () => {
+    if (user) {
+      const updatedUser = { ...user };
+      delete (updatedUser as any).delete_at;
+      setUser(updatedUser);
+      Alert.alert('Account Restored', 'Your account deletion request has been cancelled.');
+    }
   };
 
   const handleMenuPress = (key: string) => {
@@ -280,9 +528,7 @@ export default function ProfileScreen() {
       case 'activity':
         setIsRecentActivityModalVisible(true);
         break;
-      case 'goals':
-        setIsGoalsModalVisible(true);
-        break;
+
       case 'achievements':
         router.push('/(tabs)/achievements');
         break;
@@ -332,11 +578,25 @@ export default function ProfileScreen() {
           <Text style={styles.headerTitle}>Hunter Profile</Text>
         </View>
 
+        {userAny?.delete_at && (
+          <View style={styles.deletionPendingBanner}>
+            <View style={styles.deletionPendingLeft}>
+              <Ionicons name="warning-outline" size={16} color="#EF4444" style={{ marginRight: 6 }} />
+              <Text style={styles.deletionPendingText}>
+                Account deletes in {Math.max(1, Math.ceil((userAny.delete_at - Date.now()) / (1000 * 60 * 60 * 24)))} days
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleCancelDeletion} style={styles.undoDeletionBtn} activeOpacity={0.7}>
+              <Text style={styles.undoDeletionText}>Undo</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* TOP PROFILE SECTION (NO OUTER CARD BOX) */}
         <View style={styles.profileCard}>
           {/* Character Artwork Background on Right */}
           <Image
-            source={require('@/assets/images/profileright.png')}
+            source={currentAvatarSource}
             style={styles.watermarkBg}
             resizeMode="cover"
           />
@@ -442,11 +702,7 @@ export default function ProfileScreen() {
             label="Your Activity"
             onPress={() => handleMenuPress('activity')}
           />
-          <MenuItem
-            icon="flag-outline"
-            label="My Goals"
-            onPress={() => handleMenuPress('goals')}
-          />
+
           <MenuItem
             icon="trophy-outline"
             label="Achievements"
@@ -520,7 +776,7 @@ export default function ProfileScreen() {
 
         {/* FOOTER METADATA SECTION */}
         <View style={styles.footerSection}>
-          <Text style={styles.footerHeading}>Made with ❤️ in Tamil Nadu, India</Text>
+          <Text style={styles.footerHeading}>Made with ❤️ in India</Text>
           <Text style={styles.footerSubheading}>To make the world a healthier place.</Text>
 
           <View style={styles.footerLinksRow}>
@@ -536,20 +792,17 @@ export default function ProfileScreen() {
               <Text style={styles.footerLinkText}>Disclaimer</Text>
             </TouchableOpacity>
             <Text style={styles.footerDotText}>•</Text>
-            <TouchableOpacity onPress={() => setActiveModal('Disclaimer (AI)')}>
-              <Text style={styles.footerLinkText}>Disclaimer (AI)</Text>
-            </TouchableOpacity>
-            <Text style={styles.footerDotText}>•</Text>
             <TouchableOpacity onPress={() => setActiveModal('Acknowledgements')}>
               <Text style={styles.footerLinkText}>Acknowledgements</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={() => Alert.alert('Restore Purchases', 'Your purchases have been synced successfully!')}>
-            <Text style={styles.footerRestoreText}>Restore Purchases</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.footerVersionText}>Version: 1.130.0 (9548)</Text>
+          <Text style={styles.footerVersionText}>
+            Version: {Constants.expoConfig?.version ?? '1.0.0'} ({Platform.select({
+              ios: Constants.expoConfig?.ios?.buildNumber,
+              android: Constants.expoConfig?.android?.versionCode?.toString(),
+            }) ?? '1'})
+          </Text>
         </View>
       </ScrollView>
 
@@ -586,49 +839,104 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
-            {/* REVAMPED ANIME HERO GUEST PASS CARD */}
-            <View style={styles.guestPassCardWrapper}>
-              <Image
-                source={require('@/assets/images/guest_pass_anime.png')}
-                style={styles.guestPassAnimeArtBg}
-                resizeMode="cover"
-              />
-              <LinearGradient
-                colors={['rgba(24, 24, 27, 0.85)', 'rgba(194, 65, 12, 0.75)', 'rgba(249, 115, 22, 0.55)']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.guestPassGradientOverlay}
+            {/* CARD GLOW CONTAINER */}
+            <View style={styles.guestPassCardGlowContainer}>
+              {/* Pulsing Glow Background Layer */}
+              <Animated.View style={[styles.guestPassPulseGlowLayer, { opacity: glowAnim }]} />
+
+              {/* REVAMPED ANIME HERO GUEST PASS CARD */}
+              <ViewShot
+                ref={guestPassCardRef}
+                options={{ format: 'png', quality: 1 }}
+                style={{ width: '100%', borderRadius: 20, overflow: 'hidden' }}
               >
-                {/* Top Badge Row */}
-                <View style={styles.guestPassTopRow}>
-                  <View style={styles.guestPassRarityBadge}>
-                    <Ionicons name="sparkles" size={12} color="#FBBF24" />
-                    <Text style={styles.guestPassRarityText}>LEGENDARY GUEST PASS</Text>
-                  </View>
-                </View>
+                <View style={styles.guestPassCardWrapper}>
+                  <Image
+                    source={CLOUDINARY_ASSETS.refer_bg}
+                    style={styles.guestPassAnimeArtBg}
+                    resizeMode="cover"
+                  />
 
-                {/* Card Main Title */}
-                <View style={styles.guestPassCenterContent}>
-                  <Text style={styles.guestPassMainTitle}>Guest Pass</Text>
-                  <Text style={styles.guestPassSubTitle}>ALL-ACCESS HUNTER PASS</Text>
-                </View>
+                  {/* Scanning Line Animation Layer */}
+                  <Animated.View
+                    style={[
+                      styles.scanLineContainer,
+                      {
+                        transform: [{ translateY: scanAnim }],
+                        opacity: scanAnim.interpolate({
+                          inputRange: [0, 15, 100, 115],
+                          outputRange: [0, 0.25, 0.25, 0],
+                        }),
+                      },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={['rgba(255, 210, 90, 0)', 'rgba(255, 210, 90, 0.2)', 'rgba(255, 210, 90, 0)']}
+                      style={styles.scanLineGlow}
+                    />
+                    <View style={styles.scanLineCore} />
+                  </Animated.View>
 
-                {/* Card Footer Row */}
-                <View style={styles.guestPassFooterRow}>
-                  <View style={styles.guestPassBrandGroup}>
-                    <View style={styles.guestPassIconBadge}>
-                      <Text style={styles.guestPassIconText}>⚔️</Text>
+                  <LinearGradient
+                    colors={['rgba(10, 15, 30, 0.45)', 'rgba(6, 10, 22, 0.65)', 'rgba(10, 18, 36, 0.85)']}
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                    style={styles.guestPassGradientOverlay}
+                  >
+                    {/* Top Row: Legendary Badge and Sys Req */}
+                    <View style={styles.guestPassTopRow}>
+                      <View style={styles.guestPassRarityBadge}>
+                        <View style={styles.starCircleIcon}>
+                          <Ionicons name="star" size={7} color="#0E1116" />
+                        </View>
+                        <Text style={styles.guestPassRarityText}>LEGENDARY GUEST PASS</Text>
+                      </View>
+                      <View style={styles.guestPassSysReqGroup}>
+                        <Text style={styles.guestPassAuthText}>Code : {referralCode}</Text>
+                      </View>
                     </View>
-                    <Text style={styles.guestPassBrandText}>HunterX.</Text>
-                  </View>
-                  <View style={styles.guestPassIssuerBadge}>
-                    <Text style={styles.guestPassIssuerText}>
-                      ISSUED BY {displayName.toUpperCase()}
-                    </Text>
-                  </View>
+
+
+
+                    {/* Main Titles Overlay */}
+                    <View style={styles.guestPassCenterTextGroup}>
+                      <Text style={styles.guestPassMainTitle}>Guest Pass</Text>
+                      <Text style={styles.guestPassSubTitle}>ALL-ACCESS HUNTER PASS</Text>
+                    </View>
+
+                    {/* Bottom Row */}
+                    <View style={styles.guestPassFooterRow}>
+                      <View style={styles.guestPassBrandGroup}>
+                        <View style={styles.guestPassIconBadge}>
+                          <MaterialCommunityIcons name="sword-cross" size={13} color="#FFFFFF" />
+                        </View>
+                        <Text style={styles.guestPassBrandText}>HunterX.</Text>
+                      </View>
+                      <View style={styles.guestPassIssuerBadge}>
+                        <Text style={styles.guestPassIssuerText}>
+                          ISSUED BY {displayName ? displayName.toUpperCase() : 'SYSTEM'}
+                        </Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
                 </View>
-              </LinearGradient>
+              </ViewShot>
             </View>
+
+            {/* RECRUITMENT XP BADGE */}
+            <LinearGradient
+              colors={['rgba(234, 179, 8, 0.14)', 'rgba(234, 179, 8, 0.04)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.recruitmentXpBadge}
+            >
+              <View style={styles.recruitmentXpIconWrap}>
+                <Ionicons name="medal-outline" size={16} color="#FBBF24" />
+              </View>
+              <Text style={styles.recruitmentXpText}>
+                Awakening bonus: <Text style={styles.recruitmentXpTextGold}>+50 XP</Text>
+              </Text>
+            </LinearGradient>
 
             {/* Unique Referral Link Section */}
             <View style={styles.referralSectionContainer}>
@@ -648,7 +956,7 @@ export default function ProfileScreen() {
               </View>
 
               <Text style={styles.referralSubtext}>
-                Recipient must be a new HunterX customer
+                Only new hunters may pass through this gate
               </Text>
             </View>
           </ScrollView>
@@ -661,186 +969,13 @@ export default function ProfileScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
-              <Text style={styles.sendInviteBtnText}>Send Invitation</Text>
+              <Text style={styles.sendInviteBtnText}>Awaken a Hunter</Text>
             </TouchableOpacity>
           </View>
         </Screen>
       </Modal>
 
-      {/* FULL REVAMPED MY GOALS MODAL SCREEN */}
-      <Modal
-        visible={isGoalsModalVisible}
-        animationType="slide"
-        presentationStyle="fullScreen"
-        statusBarTranslucent
-        onRequestClose={() => setIsGoalsModalVisible(false)}
-      >
-        <Screen style={styles.screen}>
-          {/* Header Bar */}
-          <View style={styles.goalsHeaderBar}>
-            <TouchableOpacity
-              style={styles.editBackBtn}
-              onPress={() => setIsGoalsModalVisible(false)}
-            >
-              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.goalsHeaderTitle}>My Goals</Text>
-            <View style={{ width: 24 }} />
-          </View>
 
-          <ScrollView
-            contentContainerStyle={styles.goalsScrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* MAIN QUEST HERO CARD */}
-            <View style={styles.mainQuestHeroCard}>
-              <View style={styles.mainQuestHeaderRow}>
-                <View style={styles.mainQuestCrownBadge}>
-                  <Text style={styles.mainQuestCrownIcon}>👑</Text>
-                  <Text style={styles.mainQuestLabelText}>MAIN QUEST</Text>
-                </View>
-                <Text style={styles.mainQuestPercentText}>66%</Text>
-              </View>
-
-              <Text style={styles.mainQuestTitleText}>Weight Transformation</Text>
-
-              <View style={styles.mainQuestValueRow}>
-                <Text style={styles.mainQuestCurrentVal}>75.0 kg</Text>
-                <Text style={styles.mainQuestTargetVal}>/ target 70.0 kg</Text>
-              </View>
-
-              {/* Progress Bar Track */}
-              <View style={styles.mainQuestTrack}>
-                <LinearGradient
-                  colors={['#EA580C', '#F97316', '#FBBF24']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.mainQuestFill, { width: '66%' }]}
-                />
-              </View>
-
-              <Text style={styles.mainQuestSubtext}>5.0 kg lost - 5.0 kg to go</Text>
-            </View>
-
-            {/* ACTIVE QUESTS SECTION HEADER */}
-            <Text style={styles.questsSectionHeader}>ACTIVE QUESTS</Text>
-
-            {/* ACTIVE QUEST CARDS */}
-            <View style={styles.activeQuestsContainer}>
-              {/* Quest 1: Build Strength */}
-              <View style={styles.questItemCard}>
-                <View style={styles.questHeaderRow}>
-                  <View style={styles.questIconCircle}>
-                    <Ionicons name="barbell-outline" size={16} color="#F97316" />
-                  </View>
-                  <View style={styles.questTitleBlock}>
-                    <Text style={styles.questTitle}>Build Strength</Text>
-                    <Text style={styles.questSubtitle}>12 / 20 workouts - 60% complete</Text>
-                  </View>
-                  <Text style={styles.questXpRewardText}>+500 XP</Text>
-                </View>
-                <View style={styles.questProgressBarTrack}>
-                  <View style={[styles.questProgressBarFill, { width: '60%', backgroundColor: '#F97316' }]} />
-                </View>
-              </View>
-
-              {/* Quest 2: Daily Hydration */}
-              <View style={styles.questItemCard}>
-                <View style={styles.questHeaderRow}>
-                  <View style={styles.questIconCircle}>
-                    <Ionicons name="water-outline" size={16} color="#F97316" />
-                  </View>
-                  <View style={styles.questTitleBlock}>
-                    <Text style={styles.questTitle}>Daily Hydration</Text>
-                    <Text style={styles.questSubtitle}>3.0 / 3.5 L - 85% complete</Text>
-                  </View>
-                  <Text style={styles.questXpRewardText}>+120 XP</Text>
-                </View>
-                <View style={styles.questProgressBarTrack}>
-                  <View style={[styles.questProgressBarFill, { width: '85%', backgroundColor: '#F97316' }]} />
-                </View>
-              </View>
-
-              {/* Quest 3: Quality Sleep */}
-              <View style={styles.questItemCard}>
-                <View style={styles.questHeaderRow}>
-                  <View style={styles.questIconCircle}>
-                    <Ionicons name="moon-outline" size={16} color="#F97316" />
-                  </View>
-                  <View style={styles.questTitleBlock}>
-                    <Text style={styles.questTitle}>Quality Sleep</Text>
-                    <Text style={styles.questSubtitle}>7.5 / 8.0 hrs - 93% complete</Text>
-                  </View>
-                  <Text style={styles.questXpRewardText}>+90 XP</Text>
-                </View>
-                <View style={styles.questProgressBarTrack}>
-                  <View style={[styles.questProgressBarFill, { width: '93%', backgroundColor: '#F97316' }]} />
-                </View>
-              </View>
-
-              {/* Quest 4: Hunter Rank Ascension */}
-              <View style={[styles.questItemCard, { opacity: 0.7 }]}>
-                <View style={styles.questHeaderRow}>
-                  <View style={[styles.questIconCircle, { backgroundColor: '#1A1A1E', borderColor: '#2A2A30' }]}>
-                    <Ionicons name="lock-closed-outline" size={15} color="#71717A" />
-                  </View>
-                  <View style={styles.questTitleBlock}>
-                    <Text style={[styles.questTitle, { color: '#A1A1AA' }]}>Hunter Rank Ascension</Text>
-                    <Text style={styles.questSubtitle}>Rank 12 / 20 · unlocks at Lv.15</Text>
-                  </View>
-                  <Text style={[styles.questXpRewardText, { color: '#71717A' }]}>+2000 XP</Text>
-                </View>
-                <View style={styles.questProgressBarTrack}>
-                  <View style={[styles.questProgressBarFill, { width: '30%', backgroundColor: '#3F3F46' }]} />
-                </View>
-              </View>
-            </View>
-
-            {/* DASHED ADD NEW GOAL BUTTON */}
-            <TouchableOpacity
-              style={styles.dashedAddGoalBtn}
-              onPress={() => Alert.alert('Add New Goal', 'Customize your fitness targets!')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add" size={20} color="#F97316" />
-              <Text style={styles.dashedAddGoalText}>Add New Goal</Text>
-            </TouchableOpacity>
-
-            {/* COMPLETED QUESTS SECTION HEADER */}
-            <View style={styles.completedHeaderRow}>
-              <Text style={styles.questsSectionHeader}>COMPLETED QUESTS</Text>
-              <Text style={styles.completedCountText}>2 total</Text>
-            </View>
-
-            {/* COMPLETED QUEST CARDS */}
-            <View style={styles.completedQuestsContainer}>
-              {/* Completed Item 1 */}
-              <View style={styles.completedItemCard}>
-                <View style={styles.completedCheckCircle}>
-                  <Ionicons name="checkmark" size={14} color="#FBBF24" />
-                </View>
-                <View style={styles.completedTitleBlock}>
-                  <Text style={styles.completedTitle}>10K Steps Streak</Text>
-                  <Text style={styles.completedSubtitle}>Completed Aug 3</Text>
-                </View>
-                <Text style={styles.completedXpText}>+300 XP</Text>
-              </View>
-
-              {/* Completed Item 2 */}
-              <View style={styles.completedItemCard}>
-                <View style={styles.completedCheckCircle}>
-                  <Ionicons name="checkmark" size={14} color="#FBBF24" />
-                </View>
-                <View style={styles.completedTitleBlock}>
-                  <Text style={styles.completedTitle}>No Sugar — 14 Days</Text>
-                  <Text style={styles.completedSubtitle}>Completed Jul 28</Text>
-                </View>
-                <Text style={styles.completedXpText}>+450 XP</Text>
-              </View>
-            </View>
-          </ScrollView>
-        </Screen>
-      </Modal>
 
       {/* FULL SCREEN YOUR ACTIVITY MODAL (WITH OLD CONTENT & ITEM DESIGN) */}
       <Modal
@@ -1140,7 +1275,7 @@ export default function ProfileScreen() {
             {/* Top Anime Banner Header */}
             <View style={styles.rateBannerWrapper}>
               <Image
-                source={require('@/assets/images/rate_hunterx_bg.png')}
+                source={CLOUDINARY_ASSETS.rate_hunterx_bg}
                 style={styles.rateBannerBg}
                 resizeMode="cover"
               />
@@ -1294,91 +1429,241 @@ export default function ProfileScreen() {
                 }}
                 activeOpacity={0.85}
               >
-                <View style={styles.editAvatarCircleFrame}>
-                  <Image
-                    source={currentAvatarSource}
-                    style={styles.editAvatarImage}
-                    resizeMode="cover"
-                  />
-                </View>
+                <LinearGradient
+                  colors={['#FF9500', '#F97316', '#EA580C']}
+                  style={styles.editAvatarGlowRing}
+                >
+                  <View style={styles.editAvatarCircleFrame}>
+                    <Image
+                      source={currentAvatarSource}
+                      style={styles.editAvatarImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                </LinearGradient>
                 <View style={styles.editPencilBadge}>
-                  <Ionicons name="pencil" size={12} color="#000000" />
+                  <Ionicons name="camera" size={14} color="#000000" />
                 </View>
               </TouchableOpacity>
             </View>
 
-            {/* Form Fields Card */}
-            <View style={styles.formCardContainer}>
-              <View style={styles.formItemRow}>
-                <Text style={styles.formItemLabel}>Name</Text>
+            {/* Form Fields Section */}
+            <View style={styles.modernFormContainer}>
+              {/* Name field */}
+              <View style={styles.modernFormRow}>
+                <View style={styles.modernRowLeft}>
+                  <Ionicons name="person-outline" size={18} color="#F97316" style={styles.rowIcon} />
+                  <Text style={styles.modernRowLabel}>Name</Text>
+                </View>
                 <TextInput
-                  style={styles.formItemInput}
+                  style={styles.modernRowInput}
                   value={profileForm.name}
                   onChangeText={(val) => setProfileForm({ ...profileForm, name: val })}
-                  placeholderTextColor="#71717A"
+                  placeholderTextColor="#72727D"
                 />
               </View>
 
-              <View style={styles.formItemRow}>
-                <Text style={styles.formItemLabel}>Gender</Text>
-                <TextInput
-                  style={styles.formItemInput}
-                  value={profileForm.gender}
-                  onChangeText={(val) => setProfileForm({ ...profileForm, gender: val })}
-                  placeholderTextColor="#71717A"
-                />
-              </View>
-
-              {/* Birthday Row with Calendar Picker Trigger */}
+              {/* Gender field */}
               <TouchableOpacity
-                style={styles.formItemRow}
-                onPress={() => setIsDatePickerVisible(true)}
-                activeOpacity={0.7}
+                style={styles.modernFormRow}
+                onPress={() => setIsGenderDropdownOpen(!isGenderDropdownOpen)}
+                activeOpacity={0.8}
               >
-                <Text style={styles.formItemLabel}>Birthday</Text>
-                <View style={styles.datePickerTriggerRow}>
-                  <Ionicons name="calendar-outline" size={16} color="#F97316" />
-                  <Text style={styles.datePickerTriggerText}>{profileForm.birthday}</Text>
+                <View style={styles.modernRowLeft}>
+                  <Ionicons name="male-female-outline" size={18} color="#F97316" style={styles.rowIcon} />
+                  <Text style={styles.modernRowLabel}>Gender</Text>
+                </View>
+                <View style={styles.modernDateValueRow}>
+                  <Text style={styles.modernDateValueText}>{profileForm.gender}</Text>
+                  <Ionicons name={isGenderDropdownOpen ? "chevron-up" : "chevron-down"} size={16} color="#71717A" />
                 </View>
               </TouchableOpacity>
 
-              <View style={styles.formItemRow}>
-                <Text style={styles.formItemLabel}>Units</Text>
-                <TextInput
-                  style={styles.formItemInput}
-                  value={profileForm.units}
-                  onChangeText={(val) => setProfileForm({ ...profileForm, units: val })}
-                  placeholderTextColor="#71717A"
-                />
+              {isGenderDropdownOpen && (
+                <View style={styles.genderDropdownContainer}>
+                  {['Male', 'Female', 'Other'].map((item) => (
+                    <TouchableOpacity
+                      key={item}
+                      style={[
+                        styles.genderDropdownItem,
+                        profileForm.gender === item && styles.genderDropdownItemSelected,
+                      ]}
+                      onPress={() => {
+                        setProfileForm({ ...profileForm, gender: item });
+                        setIsGenderDropdownOpen(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.genderDropdownItemText,
+                          profileForm.gender === item && styles.genderDropdownItemTextSelected,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                      {profileForm.gender === item && (
+                        <Ionicons name="checkmark" size={16} color="#F97316" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* Birthday field */}
+              <TouchableOpacity
+                style={styles.modernFormRow}
+                onPress={() => setIsDatePickerVisible(true)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.modernRowLeft}>
+                  <Ionicons name="calendar-outline" size={18} color="#F97316" style={styles.rowIcon} />
+                  <Text style={styles.modernRowLabel}>Birthday</Text>
+                </View>
+                <View style={styles.modernDateValueRow}>
+                  <Text style={styles.modernDateValueText}>{profileForm.birthday}</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#71717A" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Height label & switcher header */}
+              <View style={styles.fieldHeaderRow}>
+                <View style={styles.fieldHeaderLeft}>
+                  <Ionicons name="resize-outline" size={16} color="#F97316" style={{ marginRight: 6 }} />
+                  <Text style={styles.fieldHeaderTitle}>Height</Text>
+                </View>
+                <View style={styles.unitSwitcherHeaderBtnRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.unitSwitcherHeaderBtn,
+                      profileForm.heightUnit === 'cm' && styles.unitSwitcherHeaderBtnActive,
+                    ]}
+                    onPress={() => {
+                      if (profileForm.heightUnit === 'ft') {
+                        const ftVal = parseFloat(profileForm.height);
+                        const converted = isNaN(ftVal) ? '181' : Math.round(ftVal / 0.0328084).toString();
+                        setProfileForm({ ...profileForm, heightUnit: 'cm', height: converted });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.unitSwitcherHeaderBtnText, profileForm.heightUnit === 'cm' && styles.unitSwitcherHeaderBtnTextActive]}>cm</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.unitSwitcherHeaderBtn,
+                      profileForm.heightUnit === 'ft' && styles.unitSwitcherHeaderBtnActive,
+                    ]}
+                    onPress={() => {
+                      if (profileForm.heightUnit === 'cm') {
+                        const cmVal = parseFloat(profileForm.height);
+                        const converted = isNaN(cmVal) ? '5.9' : (cmVal * 0.0328084).toFixed(1);
+                        setProfileForm({ ...profileForm, heightUnit: 'ft', height: converted });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.unitSwitcherHeaderBtnText, profileForm.heightUnit === 'ft' && styles.unitSwitcherHeaderBtnTextActive]}>ft</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              <View style={styles.formItemRow}>
-                <Text style={styles.formItemLabel}>Height</Text>
+              {/* Height field */}
+              <View style={styles.modernFormRow}>
                 <TextInput
-                  style={styles.formItemInput}
+                  style={styles.modernRowInputSingle}
                   value={profileForm.height}
                   onChangeText={(val) => setProfileForm({ ...profileForm, height: val })}
-                  placeholderTextColor="#71717A"
+                  keyboardType="numeric"
+                  placeholder="Enter height"
+                  placeholderTextColor="#72727D"
                 />
+                <Text style={styles.modernInputSuffixText}>{profileForm.heightUnit}</Text>
               </View>
 
-              <View style={[styles.formItemRow, styles.noBorderRow]}>
-                <Text style={styles.formItemLabel}>Weight</Text>
+              {/* Weight label & switcher header */}
+              <View style={styles.fieldHeaderRow}>
+                <View style={styles.fieldHeaderLeft}>
+                  <Ionicons name="fitness-outline" size={16} color="#F97316" style={{ marginRight: 6 }} />
+                  <Text style={styles.fieldHeaderTitle}>Weight</Text>
+                </View>
+                <View style={styles.unitSwitcherHeaderBtnRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.unitSwitcherHeaderBtn,
+                      profileForm.weightUnit === 'kg' && styles.unitSwitcherHeaderBtnActive,
+                    ]}
+                    onPress={() => {
+                      if (profileForm.weightUnit === 'lbs') {
+                        const lbsVal = parseFloat(profileForm.weight);
+                        const converted = isNaN(lbsVal) ? '75.0' : (lbsVal / 2.20462).toFixed(1);
+                        setProfileForm({ ...profileForm, weightUnit: 'kg', weight: converted });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.unitSwitcherHeaderBtnText, profileForm.weightUnit === 'kg' && styles.unitSwitcherHeaderBtnTextActive]}>kg</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.unitSwitcherHeaderBtn,
+                      profileForm.weightUnit === 'lbs' && styles.unitSwitcherHeaderBtnActive,
+                    ]}
+                    onPress={() => {
+                      if (profileForm.weightUnit === 'kg') {
+                        const kgVal = parseFloat(profileForm.weight);
+                        const converted = isNaN(kgVal) ? '165.3' : (kgVal * 2.20462).toFixed(1);
+                        setProfileForm({ ...profileForm, weightUnit: 'lbs', weight: converted });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.unitSwitcherHeaderBtnText, profileForm.weightUnit === 'lbs' && styles.unitSwitcherHeaderBtnTextActive]}>lbs</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Weight field */}
+              <View style={styles.modernFormRow}>
                 <TextInput
-                  style={styles.formItemInput}
+                  style={styles.modernRowInputSingle}
                   value={profileForm.weight}
                   onChangeText={(val) => setProfileForm({ ...profileForm, weight: val })}
-                  placeholderTextColor="#71717A"
+                  keyboardType="numeric"
+                  placeholder="Enter weight"
+                  placeholderTextColor="#72727D"
+                />
+                <Text style={styles.modernInputSuffixText}>{profileForm.weightUnit}</Text>
+              </View>
+
+              {/* Protein Goal field */}
+              <View style={styles.modernFormRow}>
+                <View style={styles.modernRowLeft}>
+                  <Ionicons name="nutrition-outline" size={18} color="#F97316" style={styles.rowIcon} />
+                  <Text style={styles.modernRowLabel}>Protein Goal (g)</Text>
+                </View>
+                <TextInput
+                  style={styles.modernRowInput}
+                  value={profileForm.protein}
+                  onChangeText={(val) => setProfileForm({ ...profileForm, protein: val })}
+                  keyboardType="numeric"
+                  placeholderTextColor="#72727D"
                 />
               </View>
             </View>
 
-            {/* Email & Google Account Footer */}
-            <View style={styles.accountEmailRow}>
-              <Text style={styles.accountEmailText}>{user?.email ?? 's8668072255@gmail.com'}</Text>
-              <Ionicons name="logo-google" size={16} color="#A1A1AA" />
+            {/* Linked Account Card */}
+            <View style={styles.modernAccountCard}>
+              <View style={styles.modernAccountLeft}>
+                <Ionicons name="logo-google" size={18} color="#EA4335" style={styles.accountIcon} />
+                <View>
+                  <Text style={styles.modernAccountLabel}>Google Account</Text>
+                  <Text style={styles.modernAccountEmail}>{user?.email ?? 'shakthikumar.dev@gmail.com'}</Text>
+                </View>
+              </View>
             </View>
 
+            {/* Delete Account */}
             <TouchableOpacity
               style={styles.deleteAccountContainer}
               onPress={handleDeleteAccount}
@@ -1386,208 +1671,199 @@ export default function ProfileScreen() {
               <Text style={styles.deleteAccountText}>Delete Account</Text>
             </TouchableOpacity>
           </ScrollView>
-        </Screen>
-      </Modal>
 
-      {/* CALENDAR DATE PICKER MODAL */}
-      <Modal
-        visible={isDatePickerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setPickerMode('DAY');
-          setIsDatePickerVisible(false);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.calendarCard}>
-            {/* Header Title */}
-            <Text style={styles.calendarTitle}>
-              {pickerMode === 'DAY'
-                ? 'SELECT BIRTHDAY'
-                : pickerMode === 'MONTH'
-                  ? 'SELECT MONTH'
-                  : 'SELECT YEAR'}
-            </Text>
+          {isDatePickerVisible && (
+            <View style={styles.customModalOverlay}>
+              <View style={styles.calendarCard}>
+                {/* Header Title */}
+                <Text style={styles.calendarTitle}>
+                  {pickerMode === 'DAY'
+                    ? 'SELECT BIRTHDAY'
+                    : pickerMode === 'MONTH'
+                      ? 'SELECT MONTH'
+                      : 'SELECT YEAR'}
+                </Text>
 
-            {/* Navigation Header Row */}
-            {pickerMode === 'DAY' ? (
-              <View style={styles.calendarHeaderRow}>
-                <TouchableOpacity
-                  onPress={() => {
-                    if (pickerMonthIndex === 0) {
-                      setPickerMonthIndex(11);
-                      setPickerYear(pickerYear - 1);
-                    } else {
-                      setPickerMonthIndex(pickerMonthIndex - 1);
-                    }
-                  }}
-                  style={styles.calNavBtn}
-                >
-                  <Ionicons name="chevron-back" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
+                {/* Navigation Header Row */}
+                {pickerMode === 'DAY' ? (
+                  <View style={styles.calendarHeaderRow}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (pickerMonthIndex === 0) {
+                          setPickerMonthIndex(11);
+                          setPickerYear(pickerYear - 1);
+                        } else {
+                          setPickerMonthIndex(pickerMonthIndex - 1);
+                        }
+                      }}
+                      style={styles.calNavBtn}
+                    >
+                      <Ionicons name="chevron-back" size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
 
-                {/* Clickable Month & Year Headers */}
-                <View style={styles.calMonthYearClickableGroup}>
+                    {/* Clickable Month & Year Headers */}
+                    <View style={styles.calMonthYearClickableGroup}>
+                      <TouchableOpacity
+                        onPress={() => setPickerMode('MONTH')}
+                        style={styles.calPillBtn}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.calMonthYearText}>
+                          {MONTH_NAMES[pickerMonthIndex]}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setPickerMode('YEAR')}
+                        style={styles.calPillBtn}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.calMonthYearText}>{pickerYear}</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (pickerMonthIndex === 11) {
+                          setPickerMonthIndex(0);
+                          setPickerYear(pickerYear + 1);
+                        } else {
+                          setPickerMonthIndex(pickerMonthIndex + 1);
+                        }
+                      }}
+                      style={styles.calNavBtn}
+                    >
+                      <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
                   <TouchableOpacity
-                    onPress={() => setPickerMode('MONTH')}
-                    style={styles.calPillBtn}
+                    style={styles.calBackToDayBtn}
+                    onPress={() => setPickerMode('DAY')}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.calMonthYearText}>
-                      {MONTH_NAMES[pickerMonthIndex]}
+                    <Ionicons name="arrow-back" size={16} color="#F97316" />
+                    <Text style={styles.calBackToDayText}>
+                      Back to {MONTH_NAMES[pickerMonthIndex]} {pickerYear}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setPickerMode('YEAR')}
-                    style={styles.calPillBtn}
-                    activeOpacity={0.7}
+                )}
+
+                {/* DAY VIEW */}
+                {pickerMode === 'DAY' && (
+                  <View style={styles.daysGrid}>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                      const isSelected = d === pickerDay;
+                      return (
+                        <TouchableOpacity
+                          key={d}
+                          style={[
+                            styles.dayCell,
+                            isSelected && styles.selectedDayCell,
+                          ]}
+                          onPress={() => setPickerDay(d)}
+                        >
+                          <Text
+                            style={[
+                              styles.dayCellText,
+                              isSelected && styles.selectedDayCellText,
+                            ]}
+                          >
+                            {d}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* MONTH VIEW */}
+                {pickerMode === 'MONTH' && (
+                  <View style={styles.monthsGrid}>
+                    {MONTH_NAMES.map((mName, idx) => {
+                      const isSelected = idx === pickerMonthIndex;
+                      return (
+                        <TouchableOpacity
+                          key={mName}
+                          style={[
+                            styles.monthCell,
+                            isSelected && styles.selectedMonthCell,
+                          ]}
+                          onPress={() => {
+                            setPickerMonthIndex(idx);
+                            setPickerMode('DAY');
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.monthCellText,
+                              isSelected && styles.selectedMonthCellText,
+                            ]}
+                          >
+                            {mName.slice(0, 3)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* YEAR VIEW */}
+                {pickerMode === 'YEAR' && (
+                  <ScrollView
+                    style={styles.yearsScrollContainer}
+                    contentContainerStyle={styles.yearsGrid}
+                    showsVerticalScrollIndicator={false}
                   >
-                    <Text style={styles.calMonthYearText}>{pickerYear}</Text>
+                    {YEARS_LIST.map((y) => {
+                      const isSelected = y === pickerYear;
+                      return (
+                        <TouchableOpacity
+                          key={y}
+                          style={[
+                            styles.yearCell,
+                            isSelected && styles.selectedYearCell,
+                          ]}
+                          onPress={() => {
+                            setPickerYear(y);
+                            setPickerMode('DAY');
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.yearCellText,
+                              isSelected && styles.selectedYearCellText,
+                            ]}
+                          >
+                            {y}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                )}
+
+                {/* Action Row */}
+                <View style={styles.calendarActionRow}>
+                  <TouchableOpacity
+                    style={[styles.calBtn, styles.calCancelBtn]}
+                    onPress={() => {
+                      setPickerMode('DAY');
+                      setIsDatePickerVisible(false);
+                    }}
+                  >
+                    <Text style={styles.calCancelText}>CANCEL</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.calBtn, styles.calConfirmBtn]}
+                    onPress={handleConfirmDate}
+                  >
+                    <Text style={styles.calConfirmText}>SET DATE</Text>
                   </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    if (pickerMonthIndex === 11) {
-                      setPickerMonthIndex(0);
-                      setPickerYear(pickerYear + 1);
-                    } else {
-                      setPickerMonthIndex(pickerMonthIndex + 1);
-                    }
-                  }}
-                  style={styles.calNavBtn}
-                >
-                  <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
               </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.calBackToDayBtn}
-                onPress={() => setPickerMode('DAY')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={16} color="#F97316" />
-                <Text style={styles.calBackToDayText}>
-                  Back to {MONTH_NAMES[pickerMonthIndex]} {pickerYear}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* DAY VIEW */}
-            {pickerMode === 'DAY' && (
-              <View style={styles.daysGrid}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
-                  const isSelected = d === pickerDay;
-                  return (
-                    <TouchableOpacity
-                      key={d}
-                      style={[
-                        styles.dayCell,
-                        isSelected && styles.selectedDayCell,
-                      ]}
-                      onPress={() => setPickerDay(d)}
-                    >
-                      <Text
-                        style={[
-                          styles.dayCellText,
-                          isSelected && styles.selectedDayCellText,
-                        ]}
-                      >
-                        {d}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* MONTH VIEW */}
-            {pickerMode === 'MONTH' && (
-              <View style={styles.monthsGrid}>
-                {MONTH_NAMES.map((mName, idx) => {
-                  const isSelected = idx === pickerMonthIndex;
-                  return (
-                    <TouchableOpacity
-                      key={mName}
-                      style={[
-                        styles.monthCell,
-                        isSelected && styles.selectedMonthCell,
-                      ]}
-                      onPress={() => {
-                        setPickerMonthIndex(idx);
-                        setPickerMode('DAY');
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.monthCellText,
-                          isSelected && styles.selectedMonthCellText,
-                        ]}
-                      >
-                        {mName.slice(0, 3)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* YEAR VIEW */}
-            {pickerMode === 'YEAR' && (
-              <ScrollView
-                style={styles.yearsScrollContainer}
-                contentContainerStyle={styles.yearsGrid}
-                showsVerticalScrollIndicator={false}
-              >
-                {YEARS_LIST.map((y) => {
-                  const isSelected = y === pickerYear;
-                  return (
-                    <TouchableOpacity
-                      key={y}
-                      style={[
-                        styles.yearCell,
-                        isSelected && styles.selectedYearCell,
-                      ]}
-                      onPress={() => {
-                        setPickerYear(y);
-                        setPickerMode('DAY');
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.yearCellText,
-                          isSelected && styles.selectedYearCellText,
-                        ]}
-                      >
-                        {y}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
-
-            {/* Action Row */}
-            <View style={styles.calendarActionRow}>
-              <TouchableOpacity
-                style={[styles.calBtn, styles.calCancelBtn]}
-                onPress={() => {
-                  setPickerMode('DAY');
-                  setIsDatePickerVisible(false);
-                }}
-              >
-                <Text style={styles.calCancelText}>CANCEL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.calBtn, styles.calConfirmBtn]}
-                onPress={handleConfirmDate}
-              >
-                <Text style={styles.calConfirmText}>SET DATE</Text>
-              </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          )}
+        </Screen>
       </Modal>
 
 
@@ -1614,7 +1890,7 @@ export default function ProfileScreen() {
                 {GAMIFIED_ANIME_AVATARS.map((item) => {
                   const isSelected = user?.avatarUrl
                     ? user.avatarUrl === item.assetKey || user.avatarUrl === item.id
-                    : item.id === 'naruto';
+                    : item.id === 'arise_2';
 
                   return (
                     <TouchableOpacity
@@ -1730,7 +2006,7 @@ export default function ProfileScreen() {
       <ConfirmDialog
         visible={isDeleteConfirmVisible}
         title="Delete Account"
-        message="Are you sure you want to delete your account? This action cannot be undone."
+        message="You have 7 days to retrieve your account. After 7 days, your account will be fully deleted."
         confirmLabel="Delete"
         destructive
         onConfirm={confirmDeleteAccount}
@@ -1786,6 +2062,138 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#09090B',
+  },
+  genderDropdownContainer: {
+    backgroundColor: '#1E1E24',
+    borderRadius: 12,
+    marginTop: 4,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#2D2D39',
+    overflow: 'hidden',
+  },
+  genderDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#2D2D39',
+  },
+  genderDropdownItemText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 14,
+    color: '#A1A1AA',
+  },
+  genderDropdownItemTextSelected: {
+    color: '#F97316',
+    fontFamily: fontFamilies.semiBold,
+  },
+  genderDropdownItemSelected: {
+    backgroundColor: '#272732',
+  },
+  customModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 9999,
+  },
+  fieldHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  fieldHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fieldHeaderTitle: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 14,
+    color: '#E4E4E7',
+  },
+  unitSwitcherHeaderBtnRow: {
+    flexDirection: 'row',
+    backgroundColor: '#18181B',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 1.5,
+  },
+  unitSwitcherHeaderBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unitSwitcherHeaderBtnActive: {
+    backgroundColor: '#F97316',
+  },
+  unitSwitcherHeaderBtnText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 11,
+    color: '#A1A1AA',
+  },
+  unitSwitcherHeaderBtnTextActive: {
+    color: '#FFFFFF',
+    fontFamily: fontFamilies.bold,
+  },
+  modernRowInputSingle: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 14,
+    color: '#FFFFFF',
+    flex: 1,
+    paddingVertical: 8,
+  },
+  modernInputSuffixText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 14,
+    color: '#71717A',
+  },
+  deletionPendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginVertical: 4,
+  },
+  deletionPendingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  deletionPendingText: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 13,
+    color: '#EF4444',
+    flex: 1,
+  },
+  undoDeletionBtn: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  undoDeletionText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 12,
+    color: '#FFFFFF',
   },
   container: {
     padding: 16,
@@ -2779,20 +3187,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  /* REVAMPED ANIME HERO GUEST PASS CARD STYLES */
+  guestPassCardGlowContainer: {
+    width: '100%',
+    position: 'relative',
+  },
+  guestPassPulseGlowLayer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    backgroundColor: '#0A0E17',
+    shadowColor: '#FFC83C',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 14,
+    elevation: 10,
+  },
   guestPassCardWrapper: {
     width: '100%',
-    height: 210,
-    borderRadius: 22,
+    height: 230,
+    borderRadius: 20,
     overflow: 'hidden',
     position: 'relative',
-    borderWidth: 1.5,
-    borderColor: '#F97316',
-    shadowColor: '#F97316',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
+    backgroundColor: '#0A0E17',
   },
   guestPassAnimeArtBg: {
     position: 'absolute',
@@ -2800,111 +3219,330 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   guestPassGradientOverlay: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'space-between',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+  },
+  scanLineContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 16,
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  scanLineGlow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 16,
+  },
+  scanLineCore: {
+    height: 1.5,
+    backgroundColor: 'rgba(255, 210, 90, 0.45)',
+    width: '100%',
   },
   guestPassTopRow: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 10,
   },
   guestPassRarityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    gap: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     borderWidth: 1,
     borderColor: '#FBBF24',
     borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   guestPassRarityText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
     color: '#FBBF24',
-    letterSpacing: 0.8,
-  },
-  guestPassValBadge: {
-    backgroundColor: '#F97316',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  guestPassValText: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
-  guestPassCenterContent: {
-    marginVertical: 4,
+  starCircleIcon: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FBBF24',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestPassSysReqGroup: {
+    alignItems: 'flex-end',
+  },
+  guestPassSysReqText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#FBBF24',
+    letterSpacing: 0.5,
+  },
+  guestPassAuthText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#38BDF8',
+    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+
+  /* HUD Panels */
+  hudPanelLeft: {
+    position: 'absolute',
+    top: 50,
+    left: 12,
+    width: 105,
+    backgroundColor: 'rgba(6, 10, 20, 0.65)',
+    borderWidth: 0.75,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
+    borderRadius: 4,
+    padding: 5,
+    zIndex: 5,
+  },
+  hudPanelRight: {
+    position: 'absolute',
+    top: 50,
+    right: 12,
+    width: 110,
+    backgroundColor: 'rgba(6, 10, 20, 0.65)',
+    borderWidth: 0.75,
+    borderColor: 'rgba(34, 211, 238, 0.3)',
+    borderRadius: 4,
+    padding: 5,
+    zIndex: 5,
+  },
+  radarContainer: {
+    height: 24,
+    borderWidth: 0.5,
+    borderColor: 'rgba(34, 211, 238, 0.25)',
+    borderRadius: 3,
+    marginBottom: 4,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 10, 20, 0.4)',
+    overflow: 'hidden',
+  },
+  radarCircle: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: 'rgba(34, 211, 238, 0.15)',
+  },
+  radarCircle2: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 0.5,
+    borderColor: 'rgba(34, 211, 238, 0.15)',
+  },
+  radarLineH: {
+    position: 'absolute',
+    width: '100%',
+    height: 0.5,
+    backgroundColor: 'rgba(34, 211, 238, 0.15)',
+  },
+  radarLineV: {
+    position: 'absolute',
+    width: 0.5,
+    height: '100%',
+    backgroundColor: 'rgba(34, 211, 238, 0.15)',
+  },
+  radarBlip: {
+    position: 'absolute',
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#EF4444',
+    top: 6,
+    right: 32,
+  },
+  hudPanelTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 6.5,
+    fontWeight: '900',
+    color: '#22D3EE',
+    letterSpacing: 0.3,
+    marginBottom: 4,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(34, 211, 238, 0.2)',
+    paddingBottom: 2,
+  },
+  hudStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  hudStatLabel: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 6,
+    color: '#E2E8F0',
+  },
+  hudStatBarContainer: {
+    width: 48,
+    height: 3,
+    backgroundColor: '#374151',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+  },
+  hudStatBarFilled: {
+    height: '100%',
+    borderRadius: 1.5,
+  },
+  hudPanelSubtext: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 5.5,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  hudPanelValueText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 6,
+    fontWeight: '800',
+    color: '#38BDF8',
+  },
+  hudRightText: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 5.5,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  hudRightVal: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 6,
+    fontWeight: '800',
+  },
+
+  /* Center Text & Titles */
+  guestPassCenterTextGroup: {
+    position: 'absolute',
+    bottom: 45,
+    left: 12,
+    zIndex: 10,
   },
   guestPassMainTitle: {
     fontFamily: fontFamilies.bold,
     fontSize: 34,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: -0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowColor: 'rgba(0, 0, 0, 0.95)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
   guestPassSubTitle: {
     fontFamily: fontFamilies.bold,
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FDBA74',
-    letterSpacing: 1.5,
-    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#FBBF24',
+    letterSpacing: 1.2,
+    marginTop: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
+
+  /* Footer Row */
   guestPassFooterRow: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 10,
   },
   guestPassBrandGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   guestPassIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#F97316',
-  },
-  guestPassIconText: {
-    fontSize: 13,
+    borderColor: '#22D3EE',
   },
   guestPassBrandText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
   guestPassIssuerBadge: {
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    borderRadius: 8,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 3,
+    borderWidth: 0.75,
+    borderColor: 'rgba(34, 211, 238, 0.25)',
   },
   guestPassIssuerText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#E2E8F0',
+    fontSize: 7.5,
+    fontWeight: '900',
+    color: '#38BDF8',
     letterSpacing: 0.5,
+  },
+  recruitmentXpBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 24,
+    gap: 10,
+    alignSelf: 'center',
+    marginTop: 18,
+    width: '100%',
+    shadowColor: '#EAB308',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  recruitmentXpIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(251, 191, 36, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recruitmentXpText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    letterSpacing: 0.3,
+  },
+  recruitmentXpTextGold: {
+    fontFamily: fontFamilies.bold,
+    fontWeight: '800',
+    color: '#FBBF24',
   },
 
   /* REWARD BANNER STYLES */
@@ -3066,11 +3704,19 @@ const styles = StyleSheet.create({
   },
   editAvatarCircleWrapper: {
     position: 'relative',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 106,
+    height: 106,
+    borderRadius: 53,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  editAvatarGlowRing: {
+    width: 106,
+    height: 106,
+    borderRadius: 53,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 3,
   },
   editAvatarCircleFrame: {
     width: 100,
@@ -3102,6 +3748,119 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+  },
+  modernFormContainer: {
+    gap: 12,
+    marginVertical: 10,
+  },
+  modernFormRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#18181B',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  modernRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rowIcon: {
+    width: 20,
+    textAlign: 'center',
+  },
+  modernRowLabel: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#E4E4E7',
+  },
+  modernRowInput: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#FFFFFF',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 16,
+    paddingVertical: 0,
+  },
+  modernDateValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  modernDateValueText: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#F97316',
+  },
+  modernAccountCard: {
+    backgroundColor: '#18181B',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  modernAccountLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  accountIcon: {
+    width: 20,
+    textAlign: 'center',
+  },
+  modernAccountLabel: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  modernAccountEmail: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 13,
+    color: '#A1A1AA',
+  },
+  modernAccountBadge: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.2)',
+  },
+  modernAccountBadgeText: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 11,
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  modernDeleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  modernDeleteButtonText: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
+    textDecorationLine: 'underline',
   },
   formCardContainer: {
     backgroundColor: '#16161C',
@@ -3414,14 +4173,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#52525B',
   },
-  footerRestoreText: {
-    fontFamily: fontFamilies.semiBold,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#F97316',
-    marginTop: 6,
-    textDecorationLine: 'underline',
-  },
+
   footerVersionText: {
     fontFamily: fontFamilies.regular,
     fontSize: 11,

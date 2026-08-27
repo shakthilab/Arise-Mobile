@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
@@ -109,6 +110,7 @@ const reqStyles = StyleSheet.create({
 // ── Main Screen ──────────────────────────────────────────────────────────────
 export default function ResetPasswordScreen() {
   const { height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [newPassword,     setNewPassword]     = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -191,7 +193,7 @@ export default function ResetPasswordScreen() {
   return (
     <Animated.View style={[styles.container, { opacity: bgOp }]}>
       {/* Back button */}
-      <Animated.View style={[styles.backWrapper, { opacity: backOp }]}>
+      <Animated.View style={[styles.backWrapper, { top: insets.top + 10, opacity: backOp }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color="#FFFFFF" />
         </Pressable>
@@ -365,7 +367,7 @@ export default function ResetPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -379,7 +381,6 @@ const styles = StyleSheet.create({
   // Back button
   backWrapper: {
     position: 'absolute',
-    top: 54,
     left: 20,
     zIndex: 20,
   },

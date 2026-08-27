@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Animated,
   Image,
@@ -9,9 +9,16 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { fetchTasksToday, completeTask, reopenTask } from '@/services/api/tasks.service';
+import type { TaskItem } from '@/types/task';
+import { useAuthStore } from '@/store/useAuthStore';
+import { getCurrentUser } from '@/services/api/auth.service';
 
 import { Screen } from '@/components/common/Screen';
 import { ExactMedalIcon } from '@/components/common/ExactMedalIcon';
@@ -19,19 +26,20 @@ import { DayCompleteScreen } from '@/components/features/missions/DayCompleteScr
 import { LootDropModal } from '@/components/features/loot/LootDropModal';
 import { QuestActionModal } from '@/components/features/missions/QuestActionModal';
 import { TaskCompletedToast } from '@/components/features/missions/TaskCompletedToast';
-import { TaskCompletionScreen } from '@/components/features/missions/TaskCompletionScreen';
 import { WeeklyTracker } from '@/components/features/streaks/WeeklyTracker';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { useLootDrop } from '@/hooks/useLootDrop';
 import { fontFamilies } from '@/theme/typography';
 import { getAvatarSource } from './profile';
+import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 
 export interface QuestItem {
   id: string;
   title: string;
   category: string;
   xpReward: number;
+  xpPartial?: number;
   type: 'daily' | 'weekly';
   image: any;
   status: 'todo' | 'done' | 'partial' | 'skipped';
@@ -42,6 +50,7 @@ export interface QuestItem {
   imageHeight?: number;
   imageStyle?: any;
   targetValue?: string;
+  allows_partial?: boolean;
 }
 
 const INITIAL_QUESTS: QuestItem[] = [
@@ -55,7 +64,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showWrongButton: true,
     hasStatusPopup: false,
     imageHeight: 120,
-    image: require('@/assets/images/sleep.jpg'),
+    image: CLOUDINARY_ASSETS.sleep,
     status: 'todo',
   },
   {
@@ -67,7 +76,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showTickButton: true,
     showWrongButton: true,
     hasStatusPopup: false,
-    image: require('@/assets/images/threelitterwater.jpeg'),
+    image: CLOUDINARY_ASSETS.threelitterwater,
     status: 'todo',
   },
   {
@@ -80,7 +89,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showWrongButton: true,
     hasStatusPopup: false,
     targetValue: '128 g',
-    image: require('@/assets/images/nutrition.jpeg'),
+    image: CLOUDINARY_ASSETS.nutrition,
     imageStyle: { height: 170, top: -25 },
     status: 'todo',
   },
@@ -93,7 +102,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showTickButton: true,
     showWrongButton: true,
     hasStatusPopup: false,
-    image: require('@/assets/images/run.jpeg'),
+    image: CLOUDINARY_ASSETS.run,
     status: 'todo',
   },
 ];
@@ -102,6 +111,67 @@ const ANIME_AVATARS = [
   'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=400&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=400&auto=format&fit=crop',
 ];
+
+function mapTaskToQuest(item: TaskItem, type: 'daily' | 'weekly'): QuestItem {
+  let imageSource = CLOUDINARY_ASSETS.run;
+  const tagUpper = item.tag?.toUpperCase() || '';
+  const titleUpper = item.title?.toUpperCase() || '';
+
+  if (tagUpper === 'REST' || titleUpper.includes('SLEEP')) {
+    imageSource = CLOUDINARY_ASSETS.sleep;
+  } else if (tagUpper === 'HYDRATE' || titleUpper.includes('WATER')) {
+    imageSource = CLOUDINARY_ASSETS.threelitterwater;
+  } else if (tagUpper === 'NUTRITION' || titleUpper.includes('PROTEIN')) {
+    imageSource = CLOUDINARY_ASSETS.nutrition;
+  }
+
+  const image = item.image_url ? { uri: item.image_url } : imageSource;
+
+  let status: 'todo' | 'done' | 'partial' | 'skipped' = 'todo';
+  if (item.status === 'COMPLETED') {
+    status = 'done';
+  } else if (item.status === 'PARTIAL') {
+    status = 'partial';
+  } else if (item.status === 'SKIPPED') {
+    status = 'skipped';
+  }
+
+  let targetValue: string | undefined = undefined;
+  if (item.target_value !== null && item.target_value !== undefined) {
+    let unit = item.target_unit || '';
+    if (unit === 'grams') {
+      unit = 'g';
+    } else if (unit === 'liters') {
+      unit = 'L';
+    } else if (unit === 'hours' || unit === 'hour') {
+      unit = 'hrs';
+    }
+    
+    if (unit === 'hrs' || unit === 'g' || unit === 'L') {
+      targetValue = `${item.target_value}${unit}`;
+    } else {
+      targetValue = `${item.target_value} ${unit}`.trim();
+    }
+  }
+
+  return {
+    id: item.id,
+    title: item.title,
+    category: item.tag || 'QUEST',
+    xpReward: item.xp_reward,
+    xpPartial: item.xp_partial,
+    type,
+    image,
+    status,
+    earnedXp: item.xp_earned,
+    showTickButton: item.status !== 'COMPLETED' && item.status !== 'SKIPPED',
+    showWrongButton: item.status !== 'COMPLETED' && item.status !== 'SKIPPED',
+    targetValue,
+    allows_partial: item.allows_partial,
+    imageHeight: tagUpper === 'REST' ? 120 : undefined,
+    imageStyle: tagUpper === 'NUTRITION' ? { height: 170, top: -25 } : undefined,
+  };
+}
 
 function AnimatedTickButton({ onPress }: { onPress: () => void }) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
@@ -182,22 +252,53 @@ function AnimatedWrongButton({ onPress }: { onPress: () => void }) {
 }
 
 export default function MissionsHomeScreen() {
-  const { user, restoreSession } = useAuth();
+  const { user } = useAuth();
   const { lastDrop, roll } = useLootDrop();
   const [dropVisible, setDropVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'todo' | 'done' | 'skipped'>('todo');
 
-  useEffect(() => {
-    restoreSession();
-  }, [restoreSession]);
+  const [quests, setQuests] = useState<QuestItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [quests, setQuests] = useState<QuestItem[]>(INITIAL_QUESTS);
   const [selectedQuest, setSelectedQuest] = useState<QuestItem | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
-  const [completionScreenVisible, setCompletionScreenVisible] = useState(false);
   const [completedToastVisible, setCompletedToastVisible] = useState(false);
   const [dayCompleteModalVisible, setDayCompleteModalVisible] = useState(false);
   const [toastXp, setToastXp] = useState(10);
+  const [errorToastVisible, setErrorToastVisible] = useState(false);
+  const [errorToastTitle, setErrorToastTitle] = useState('Action Failed');
+  const [errorToastSubtitle, setErrorToastSubtitle] = useState('');
+
+  const loadTasks = useCallback(async () => {
+    try {
+      setError(null);
+      const [tasksData, refreshedUser] = await Promise.all([
+        fetchTasksToday(),
+        getCurrentUser(),
+      ]);
+      const mappedDaily = (tasksData.daily || []).map((item) => mapTaskToQuest(item, 'daily'));
+      const mappedWeekly = (tasksData.weekly || []).map((item) => mapTaskToQuest(item, 'weekly'));
+      setQuests([...mappedDaily, ...mappedWeekly]);
+      useAuthStore.getState().setUser(refreshedUser);
+    } catch (err: any) {
+      console.error('[LoadTasks Error]', err);
+      setError(err?.message || 'Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadTasks();
+    setRefreshing(false);
+  }, [loadTasks]);
+
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
 
   const displayName = user?.displayName ? user.displayName.toUpperCase() : 'SEYMEN';
   const displayXP = (user?.xp ?? 1240).toLocaleString();
@@ -206,13 +307,16 @@ export default function MissionsHomeScreen() {
   const completedDays = user?.completedDaysCount ?? user?.weeklyStreak ?? user?.user_progression?.weekly_streak ?? (displayStreak > 0 ? Math.min(displayStreak, 7) : 5);
 
   const getQuestTargetValue = (quest: QuestItem) => {
+    if (quest.targetValue) {
+      return quest.targetValue;
+    }
     if (quest.title === 'Protein Goal') {
       const goal = user?.daily_protein_goal;
       if (goal) {
-        return `${goal} g`;
+        return `${goal}g`;
       }
     }
-    return quest.targetValue;
+    return undefined;
   };
 
   const todoQuests = quests.filter((q) => q.status === 'todo');
@@ -232,91 +336,184 @@ export default function MissionsHomeScreen() {
     }
   }, [todoQuests.length, quests.length]);
 
+  const prevTodoCountRef = useRef<number | null>(null);
+
+  // Automatically switch tabs based on todoQuests count
+  useEffect(() => {
+    if (!loading) {
+      const prevCount = prevTodoCountRef.current;
+      const currentCount = todoQuests.length;
+      
+      // 1. Initial load completed
+      if (prevCount === null) {
+        if (currentCount === 0 && quests.length > 0) {
+          setActiveTab('done');
+        } else {
+          setActiveTab('todo');
+        }
+      } 
+      // 2. Action occurred: all tasks completed
+      else if (currentCount === 0 && prevCount > 0 && quests.length > 0) {
+        setActiveTab('done');
+      }
+      // 3. Action occurred: task reopened/added back to todo
+      else if (currentCount > 0 && prevCount === 0) {
+        setActiveTab('todo');
+      }
+      
+      prevTodoCountRef.current = currentCount;
+    }
+  }, [todoQuests.length, quests.length, loading]);
+
+  const handleCompleteTask = useCallback(async (
+    questId: string,
+    actionStatus: 'COMPLETED' | 'PARTIAL' | 'SKIPPED' | 'PENDING'
+  ) => {
+    const previousQuests = quests;
+    const mappedStatus = actionStatus === 'COMPLETED' ? 'done' : actionStatus === 'PARTIAL' ? 'partial' : actionStatus === 'SKIPPED' ? 'skipped' : 'todo';
+    
+    const targetQuest = quests.find(q => q.id === questId);
+    if (!targetQuest) return;
+
+    let optimisticEarnedXp = 0;
+    if (actionStatus === 'COMPLETED') {
+      optimisticEarnedXp = targetQuest.xpReward;
+    } else if (actionStatus === 'PARTIAL') {
+      optimisticEarnedXp = targetQuest.xpPartial ?? Math.round(targetQuest.xpReward / 2);
+    }
+
+    setQuests((prev) =>
+      prev.map((q) =>
+        q.id === questId
+          ? {
+              ...q,
+              status: mappedStatus,
+              earnedXp: actionStatus === 'PENDING' ? undefined : optimisticEarnedXp,
+            }
+          : q
+      )
+    );
+
+    if (actionStatus === 'COMPLETED' || actionStatus === 'PARTIAL') {
+      setToastXp(optimisticEarnedXp);
+      setCompletedToastVisible(true);
+      if (actionStatus === 'COMPLETED') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      }
+    } else {
+      setCompletedToastVisible(false);
+    }
+
+    try {
+      const data = await completeTask(questId, actionStatus);
+      const serverStatus = data.status === 'COMPLETED' ? 'done' : data.status === 'PARTIAL' ? 'partial' : data.status === 'SKIPPED' ? 'skipped' : 'todo';
+
+      setQuests((prev) =>
+        prev.map((q) =>
+          q.id === questId
+            ? {
+                ...q,
+                status: serverStatus,
+                earnedXp: data.status === 'PENDING' ? undefined : data.xp_earned,
+              }
+            : q
+        )
+      );
+
+      try {
+        const refreshedUser = await getCurrentUser();
+        useAuthStore.getState().setUser(refreshedUser);
+      } catch (userErr) {
+        console.error('[RefreshUser Error]', userErr);
+      }
+    } catch (err: any) {
+      console.error('[CompleteTask Error]', err);
+      setQuests(previousQuests);
+      setCompletedToastVisible(false);
+
+      const status = err.response?.status;
+      const message = err.response?.data?.message || err.message || 'Failed to update task';
+
+      if (status === 401) {
+        await useAuthStore.getState().logout();
+        return;
+      }
+
+      if (status === 403) {
+        setErrorToastTitle('Task Stale');
+        setErrorToastSubtitle('This task is not assigned to you for the current period. Refreshing...');
+        setErrorToastVisible(true);
+        await loadTasks();
+        return;
+      }
+
+      setErrorToastTitle('Action Failed');
+      setErrorToastSubtitle(message);
+      setErrorToastVisible(true);
+    }
+  }, [quests, user, loadTasks]);
+
   const handleOpenQuestActions = (quest: QuestItem) => {
-    if (quest.showTickButton === false) return;
-    setQuests((prev) =>
-      prev.map((q) =>
-        q.id === quest.id ? { ...q, status: 'done', earnedXp: quest.xpReward } : q
-      )
-    );
-    setToastXp(quest.xpReward);
-    setCompletedToastVisible(true);
-  };
-
-  const handleFullComplete = () => {
-    if (!selectedQuest) return;
-    const qId = selectedQuest.id;
-    setQuests((prev) =>
-      prev.map((q) =>
-        q.id === qId ? { ...q, status: 'done', earnedXp: q.xpReward } : q
-      )
-    );
-    setCompletionScreenVisible(false);
-    setToastXp(selectedQuest.xpReward);
-    setCompletedToastVisible(true);
-  };
-
-  const handlePartialComplete = () => {
-    if (!selectedQuest) return;
-    const qId = selectedQuest.id;
-    const partialXp = Math.round(selectedQuest.xpReward / 2);
-    setQuests((prev) =>
-      prev.map((q) =>
-        q.id === qId ? { ...q, status: 'partial', earnedXp: partialXp } : q
-      )
-    );
-    setCompletionScreenVisible(false);
-    setToastXp(partialXp);
-    setCompletedToastVisible(true);
-  };
-
-  const handleSkip = () => {
-    if (!selectedQuest) return;
-    const qId = selectedQuest.id;
-    setQuests((prev) =>
-      prev.map((q) =>
-        q.id === qId ? { ...q, status: 'skipped', earnedXp: 0 } : q
-      )
-    );
-    setActionModalVisible(false);
+    if (quest.allows_partial) {
+      setSelectedQuest(quest);
+      setActionModalVisible(true);
+    } else {
+      handleCompleteTask(quest.id, 'COMPLETED');
+    }
   };
 
   const handleDirectSkip = (questId: string) => {
-    setQuests((prev) =>
-      prev.map((q) =>
-        q.id === questId ? { ...q, status: 'skipped', earnedXp: 0 } : q
-      )
-    );
+    handleCompleteTask(questId, 'SKIPPED');
   };
 
-  const handleResetQuest = (questId: string) => {
+  const handleResetQuest = useCallback(async (questId: string) => {
+    const previousQuests = quests;
     setQuests((prev) =>
       prev.map((q) =>
         q.id === questId ? { ...q, status: 'todo', earnedXp: undefined } : q
       )
     );
-  };
+    try {
+      await reopenTask(questId);
+      try {
+        const refreshedUser = await getCurrentUser();
+        useAuthStore.getState().setUser(refreshedUser);
+      } catch (userErr) {
+        console.error('[RefreshUser Error]', userErr);
+      }
+    } catch (err: any) {
+      console.error('[ReopenTask Error]', err);
+      setQuests(previousQuests);
 
-  if (activeTab === 'todo' && todoQuests.length === 0) {
-    return (
-      <Screen style={{ backgroundColor: '#0A0A0A', flex: 1 }}>
-        <DayCompleteScreen
-          quests={quests}
-          onContinue={() => {
-            setQuests((prev) =>
-              prev.map((q) => ({ ...q, status: 'todo', earnedXp: undefined }))
-            );
-          }}
-        />
-      </Screen>
-    );
-  }
+      const status = err.response?.status;
+      const message = err.response?.data?.message || err.message || 'Failed to reopen task';
+
+      if (status === 401) {
+        await useAuthStore.getState().logout();
+        return;
+      }
+
+      setErrorToastTitle('Reopen Failed');
+      setErrorToastSubtitle(message);
+      setErrorToastVisible(true);
+    }
+  }, [quests, loadTasks]);
 
   return (
     <Screen style={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#E5A93C"
+            colors={["#E5A93C"]}
+          />
+        }
       >
         {/* TOP HEADER */}
         <View style={styles.topHeader}>
@@ -353,7 +550,11 @@ export default function MissionsHomeScreen() {
         </View>
 
         {/* WEEKLY TRACKER (2ND ITEM) */}
-        <WeeklyTracker streakDays={displayStreak} completedDaysCount={completedDays} />
+        <WeeklyTracker
+          streakDays={displayStreak}
+          completedDaysCount={completedDays}
+          avatarUrl={user?.avatarUrl}
+        />
 
         {/* FILTER TABS ROW */}
         <View style={styles.filterTabsRow}>
@@ -458,13 +659,45 @@ export default function MissionsHomeScreen() {
         </View>
 
         {/* CONDITIONALLY RENDER CONTENT BASED ON ACTIVE FILTER TAB */}
-        {activeTab === 'todo' && (
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#E5A93C" />
+          </View>
+        ) : error ? (
+          <View style={styles.emptyStateCard}>
+            <Ionicons name="alert-circle-outline" size={56} color="#FF4D6D" />
+            <Text style={styles.emptyStateTitle}>Error Loading Tasks</Text>
+            <Text style={styles.emptyStateSubtext}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadTasks}>
+              <Text style={styles.retryButtonText}>RETRY</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
           <>
-            {todoQuests.length === 0 ? (
-              <View style={styles.peakReachedCard}>
+            {activeTab === 'todo' && (
+              <>
+                {quests.length === 0 ? (
+                  <View style={styles.emptyStateCard}>
+                    <Ionicons name="calendar-outline" size={56} color="#71717A" />
+                    <Text style={styles.emptyStateTitle}>No Tasks Assigned</Text>
+                    <Text style={styles.emptyStateSubtext}>
+                      There are no tasks assigned to you for today.
+                    </Text>
+                  </View>
+                ) : todoQuests.length === 0 ? (
+              <LinearGradient
+                colors={['#18181B', '#0E0E10']}
+                style={styles.peakReachedCard}
+              >
                 <View style={styles.peakReachedLeftCol}>
-                  <Text style={styles.peakReachedSubtag}>— PEAK REACHED —</Text>
-                  <Text style={styles.peakReachedTitle}>Nothing left on the list today.</Text>
+                  <View style={styles.peakHeaderRow}>
+                    <Ionicons name="trophy" size={18} color="#E5A93C" style={{ marginRight: 6 }} />
+                    <Text style={styles.peakReachedSubtag}>PEAK REACHED</Text>
+                  </View>
+                  <Text style={styles.peakReachedTitle}>Daily Quests Cleared!</Text>
+                  <Text style={styles.peakReachedSubtext}>
+                    All objectives successfully resolved for today. Arise, Hunter.
+                  </Text>
                 </View>
 
                 <TouchableOpacity
@@ -475,10 +708,10 @@ export default function MissionsHomeScreen() {
                     setDayCompleteModalVisible(true);
                   }}
                 >
-                  <Text style={styles.peakShareBtnText}>SHARE</Text>
-                  <Ionicons name="arrow-forward" size={14} color="#0A0A0A" />
+                  <Text style={styles.peakShareBtnText}>CELEBRATE</Text>
+                  <Ionicons name="sparkles" size={14} color="#0A0A0A" />
                 </TouchableOpacity>
-              </View>
+              </LinearGradient>
             ) : (
               <>
                 {/* ROUTINE QUESTS Section */}
@@ -595,60 +828,40 @@ export default function MissionsHomeScreen() {
                 </Text>
               </View>
             ) : (
-              doneQuests.map((quest) => {
-                const isPartial = quest.status === 'partial';
-                return (
-                  <View key={quest.id} style={styles.questCard}>
-                    <View style={styles.questImageWrapper}>
-                      <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
+              doneQuests.map((quest) => (
+                <View key={quest.id} style={styles.questCard}>
+                  <View style={styles.questImageWrapper}>
+                    <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
 
-                      <View
-                        style={[
-                          styles.xpBadgeTopRight,
-                          isPartial ? styles.partialBadgeContainer : styles.doneBadgeContainer,
-                        ]}
-                      >
-                        <Ionicons
-                          name={isPartial ? 'pie-chart' : 'checkmark-circle'}
-                          size={14}
-                          color={isPartial ? '#F59E0B' : '#22C55E'}
-                        />
-                        <Text
-                          style={[
-                            styles.xpBadgeText,
-                            { color: isPartial ? '#F59E0B' : '#22C55E' },
-                          ]}
-                        >
-                          {isPartial ? `PARTIAL (+${quest.earnedXp} XP)` : `DONE (+${quest.earnedXp} XP)`}
-                        </Text>
+                    <View style={styles.topRightActionsCol}>
+                      <View style={styles.xpBadgeInline}>
+                        <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
                       </View>
-                    </View>
-
-                    <View style={styles.questBody}>
-                      <View style={styles.questTitleCol}>
-                        <View style={styles.categoryRow}>
-                          <View style={styles.categoryPill}>
-                            <Text style={styles.categoryPillText}>{quest.category}</Text>
-                          </View>
-                          <View style={styles.routineBadgeInline}>
-                            <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                            <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.questTitle}>{quest.title}</Text>
-                      </View>
-
-                      <TouchableOpacity
-                        style={styles.undoButton}
-                        onPress={() => handleResetQuest(quest.id)}
-                      >
-                        <Ionicons name="refresh-outline" size={16} color="#A1A1AA" />
-                        <Text style={styles.undoButtonText}>Reset</Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
-                );
-              })
+
+                  <View style={styles.questBody}>
+                    <View style={styles.questTitleCol}>
+                      <View style={styles.categoryRow}>
+                        <View style={styles.categoryPill}>
+                          <Text style={styles.categoryPillText}>{quest.category}</Text>
+                        </View>
+                        <View style={styles.routineBadgeInline}>
+                          <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                          <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.questTitle}>{quest.title}</Text>
+                    </View>
+
+                    {getQuestTargetValue(quest) && (
+                      <View style={styles.targetValueBox}>
+                        <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))
             )}
           </>
         )}
@@ -666,7 +879,7 @@ export default function MissionsHomeScreen() {
               </View>
             ) : (
               skippedQuests.map((quest) => (
-                <View key={quest.id} style={styles.questCard}>
+                <View key={quest.id} style={[styles.questCard, { opacity: 0.55 }]}>
                   <View style={styles.questImageWrapper}>
                     <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
 
@@ -703,22 +916,38 @@ export default function MissionsHomeScreen() {
             )}
           </>
         )}
+          </>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
-
       {/* Quest Action Selection Modal (Partial, Skip, Complete) */}
       <QuestActionModal
         visible={actionModalVisible}
         questTitle={selectedQuest?.title ?? ''}
         questCategory={selectedQuest?.category ?? ''}
         xpReward={selectedQuest?.xpReward ?? 0}
+        questTargetValue={selectedQuest?.targetValue ?? undefined}
         onClose={() => setActionModalVisible(false)}
-        onFullComplete={handleFullComplete}
-        onPartialComplete={handlePartialComplete}
-        onSkip={handleSkip}
+        onFullComplete={() => {
+          if (selectedQuest) {
+            handleCompleteTask(selectedQuest.id, 'COMPLETED');
+          }
+          setActionModalVisible(false);
+        }}
+        onPartialComplete={() => {
+          if (selectedQuest) {
+            handleCompleteTask(selectedQuest.id, 'PARTIAL');
+          }
+          setActionModalVisible(false);
+        }}
+        onSkip={() => {
+          if (selectedQuest) {
+            handleCompleteTask(selectedQuest.id, 'SKIPPED');
+          }
+          setActionModalVisible(false);
+        }}
       />
-
       {/* Loot Drop Modal */}
       <LootDropModal visible={dropVisible} rarity={lastDrop} onDismiss={() => setDropVisible(false)} />
 
@@ -727,6 +956,15 @@ export default function MissionsHomeScreen() {
         visible={completedToastVisible}
         xp={toastXp}
         onDismiss={() => setCompletedToastVisible(false)}
+      />
+
+      {/* Error Toast Popup */}
+      <TaskCompletedToast
+        visible={errorToastVisible}
+        title={errorToastTitle}
+        subtitle={errorToastSubtitle}
+        isError={true}
+        onDismiss={() => setErrorToastVisible(false)}
       />
 
       {/* Day Complete Modal Popup */}
@@ -1383,5 +1621,35 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.bold,
     fontSize: 12,
     color: '#A1A1AA',
+  },
+  loadingContainer: {
+    paddingVertical: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#E5A93C',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 14,
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  peakHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  peakReachedSubtext: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    color: '#A1A1AA',
+    marginTop: 4,
+    lineHeight: 16,
   },
 });

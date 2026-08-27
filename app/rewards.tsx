@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
-  SafeAreaView,
   Share,
   Clipboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -228,7 +228,7 @@ export default function RewardsScreen() {
         />
       </Animated.View>
 
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Toast Notification */}
         {copiedCode && (
           <View style={styles.toastContainer}>
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 56,
+    paddingTop: 12,
   },
   toastContainer: {
     position: 'absolute',

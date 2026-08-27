@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
 import { Button } from '@/components/common/Button';
@@ -27,6 +28,7 @@ const easeOutCubic = Easing.out(Easing.cubic);
 
 export default function VerifyOtpScreen() {
   const { email, fromSignup } = useLocalSearchParams<{ email: string; fromSignup?: string }>();
+  const insets = useSafeAreaInsets();
   const setVerifiedEmail = useOnboardingStore((s) => s.setVerifiedEmail);
   const [code, setCode] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -176,7 +178,7 @@ export default function VerifyOtpScreen() {
         style={styles.keyboardView}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -246,7 +248,13 @@ export default function VerifyOtpScreen() {
         </ScrollView>
 
         {/* CTA Verify Button at the Bottom */}
-        <Animated.View style={[styles.bottomBar, fadeSlideStyle(buttonAnim)]}>
+        <Animated.View
+          style={[
+            styles.bottomBar,
+            { paddingBottom: insets.bottom + 12 },
+            fadeSlideStyle(buttonAnim),
+          ]}
+        >
           <Button
             label="VERIFY CODE"
             onPress={handleVerify}
@@ -265,7 +273,7 @@ export default function VerifyOtpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -273,7 +281,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 44 : 20,
     paddingBottom: 24,
   },
   backButton: {
@@ -432,11 +439,10 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 28,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
-    backgroundColor: '#0A0A0A',
+    backgroundColor: colors.background,
   },
   ctaButton: {
     height: 56,

@@ -16,6 +16,7 @@ export interface QuestActionModalProps {
   questTitle: string;
   questCategory: string;
   xpReward: number;
+  questTargetValue?: string;
   onClose: () => void;
   onFullComplete: () => void;
   onPartialComplete: () => void;
@@ -25,10 +26,14 @@ export interface QuestActionModalProps {
 export function QuestActionModal({
   visible,
   questTitle,
+  questTargetValue,
+  xpReward,
   onClose,
   onFullComplete,
   onPartialComplete,
 }: QuestActionModalProps) {
+  const targetLabel = questTargetValue ? `Target · ${questTargetValue}` : `XP Reward · ${xpReward} XP`;
+
   return (
     <Modal
       animationType="fade"
@@ -38,41 +43,57 @@ export function QuestActionModal({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-          {/* Top Handle Indicator */}
-          <View style={styles.handleBar} />
 
-          {/* Header */}
-          <View style={styles.headerContainer}>
-            <Text style={styles.questTitleHeader}>{questTitle}</Text>
-            <Text style={styles.subtitleText}>SELECT COMPLETION STATUS</Text>
+          {/* Header Row */}
+          <View style={styles.headerRow}>
+            <Text style={styles.logProgressLabel}>LOG PROGRESS</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Ionicons name="close" size={20} color="#71717A" />
+            </TouchableOpacity>
           </View>
 
-          {/* Action Option Cards Row */}
-          <View style={styles.optionsRow}>
-            {/* DONE BUTTON */}
+          {/* Title & Target Details */}
+          <View style={styles.detailsContainer}>
+            <Text style={styles.questTitle}>{questTitle}</Text>
+            <Text style={styles.targetDetail}>{targetLabel}</Text>
+          </View>
+
+          {/* Option Stack (Vertical Stack) */}
+          <View style={styles.optionStack}>
+            {/* COMPLETED CARD */}
             <TouchableOpacity
-              style={[styles.optionCard, styles.doneCard]}
-              activeOpacity={0.8}
+              style={styles.completedOptionCard}
+              activeOpacity={0.85}
               onPress={onFullComplete}
             >
-              <View style={styles.iconCircleDone}>
-                <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+              <View style={styles.iconCircleCompleted}>
+                <Ionicons name="checkmark" size={18} color="#22C55E" />
               </View>
-              <Text style={styles.doneBtnText}>DONE</Text>
+              <View style={styles.optionTextColumn}>
+                <Text style={styles.optionTitleText}>COMPLETED</Text>
+                <Text style={styles.optionSubtitleText}>Full XP · quest cleared</Text>
+              </View>
             </TouchableOpacity>
 
-            {/* PARTIAL BUTTON */}
+            {/* PARTIALLY COMPLETED CARD */}
             <TouchableOpacity
-              style={[styles.optionCard, styles.partialCard]}
-              activeOpacity={0.8}
+              style={styles.partialOptionCard}
+              activeOpacity={0.85}
               onPress={onPartialComplete}
             >
               <View style={styles.iconCirclePartial}>
-                <Ionicons name="pie-chart" size={18} color="#FFFFFF" />
+                <Ionicons name="flash" size={18} color="#F59E0B" />
               </View>
-              <Text style={styles.partialBtnText}>PARTIAL</Text>
+              <View style={styles.optionTextColumn}>
+                <Text style={styles.optionTitleText}>PARTIALLY COMPLETED</Text>
+                <Text style={styles.optionSubtitleText}>Half XP · progress still counts</Text>
+              </View>
             </TouchableOpacity>
           </View>
+
         </Pressable>
       </Pressable>
     </Modal>
@@ -82,22 +103,19 @@ export function QuestActionModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalCard: {
-    width: '92%',
-    maxWidth: 340,
-    backgroundColor: '#121215',
-    borderRadius: 22,
+    width: '94%',
+    maxWidth: 360,
+    backgroundColor: '#0F1012',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#27272A',
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 22,
-    alignItems: 'center',
+    borderColor: '#222227',
+    padding: 24,
     gap: 16,
     elevation: 12,
     shadowColor: '#000',
@@ -105,88 +123,88 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 18,
   },
-  handleBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#3F3F46',
-  },
-  headerContainer: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  questTitleHeader: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 19,
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  subtitleText: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 10,
-    color: '#71717A',
-    letterSpacing: 1.2,
-    textAlign: 'center',
-  },
-  optionsRow: {
+  headerRow: {
     flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  optionCard: {
-    flex: 1,
-    flexDirection: 'column',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    paddingVertical: 18,
-    gap: 10,
+  },
+  logProgressLabel: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 11,
+    color: '#FF6A00',
+    letterSpacing: 1.5,
+  },
+  detailsContainer: {
+    gap: 4,
+    marginTop: 4,
+  },
+  questTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 22,
+    color: '#FFFFFF',
+  },
+  targetDetail: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 14,
+    color: '#71717A',
+  },
+  optionStack: {
+    gap: 12,
+    marginTop: 8,
+  },
+  completedOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16171B',
+    borderRadius: 18,
     borderWidth: 1.5,
+    borderColor: 'rgba(34, 197, 94, 0.45)',
+    padding: 16,
+    gap: 14,
   },
-  doneCard: {
-    backgroundColor: 'rgba(34, 197, 94, 0.08)',
-    borderColor: '#22C55E',
+  partialOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16171B',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+    padding: 16,
+    gap: 14,
   },
-  partialCard: {
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
-    borderColor: '#F59E0B',
-  },
-  iconCircleDone: {
+  iconCircleCompleted: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#22C55E',
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 3,
   },
   iconCirclePartial: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 3,
   },
-  doneBtnText: {
+  optionTextColumn: {
+    flex: 1,
+    gap: 2,
+  },
+  optionTitleText: {
     fontFamily: fontFamilies.bold,
     fontSize: 14,
-    color: '#22C55E',
-    letterSpacing: 0.8,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
-  partialBtnText: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 14,
-    color: '#F59E0B',
-    letterSpacing: 0.8,
+  optionSubtitleText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    color: '#71717A',
   },
 });

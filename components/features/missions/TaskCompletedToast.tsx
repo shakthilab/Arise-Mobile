@@ -10,6 +10,7 @@ export interface TaskCompletedToastProps {
   title?: string;
   subtitle?: string;
   onDismiss?: () => void;
+  isError?: boolean;
 }
 
 export function TaskCompletedToast({
@@ -18,6 +19,7 @@ export function TaskCompletedToast({
   title = 'Task Completed!',
   subtitle = 'Great job, hunter!',
   onDismiss,
+  isError = false,
 }: TaskCompletedToastProps) {
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -83,9 +85,9 @@ export function TaskCompletedToast({
         onPress={handleDismiss}
         style={styles.card}
       >
-        {/* Green Tick Circle */}
-        <View style={styles.iconCircle}>
-          <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+        {/* Icon Circle (Green Check or Red Alert) */}
+        <View style={[styles.iconCircle, isError && styles.iconCircleError]}>
+          <Ionicons name={isError ? 'alert' : 'checkmark'} size={18} color="#FFFFFF" />
         </View>
 
         {/* Text Details */}
@@ -94,13 +96,15 @@ export function TaskCompletedToast({
           <Text style={styles.subtitleText}>{subtitle}</Text>
         </View>
 
-        {/* XP Reward & Sparkle */}
-        <View style={styles.xpContainer}>
-          <Text style={styles.xpText}>+{xp} XP</Text>
-          <View style={styles.sparkleWrapper}>
-            <Ionicons name="sparkles" size={14} color="#EA580C" />
+        {/* XP Reward & Sparkle (Only if not error) */}
+        {!isError && (
+          <View style={styles.xpContainer}>
+            <Text style={styles.xpText}>+{xp} XP</Text>
+            <View style={styles.sparkleWrapper}>
+              <Ionicons name="sparkles" size={14} color="#EA580C" />
+            </View>
           </View>
-        </View>
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -141,6 +145,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#22C55E',
+  },
+  iconCircleError: {
+    backgroundColor: '#991B1B',
+    borderColor: '#EF4444',
   },
   textContainer: {
     flex: 1,
