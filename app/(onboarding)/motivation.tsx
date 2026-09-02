@@ -196,9 +196,9 @@ export default function MotivationScreen() {
                                         </Text>
                                     </View>
 
-                                    {/* Checkbox indicator */}
-                                    <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>
-                                        {isSelected && <Feather name="check" size={12} color={colors.accentGold} />}
+                                    {/* Square Checkbox Indicator */}
+                                    <View style={[styles.checkboxSquare, isSelected && styles.checkboxSquareSelected]}>
+                                        {isSelected && <Feather name="check" size={13} color="#000000" />}
                                     </View>
                                 </Pressable>
 
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     },
     optionRowSelected: {
         borderColor: colors.accentGold,
-        backgroundColor: 'rgba(229, 169, 60, 0.06)',
+        backgroundColor: 'rgba(254, 91, 1, 0.06)',
     },
     optionIcon: {
         width: 36,
@@ -333,25 +333,21 @@ const styles = StyleSheet.create({
         color: '#8E8E93',
     },
 
-    /* ─── Radio ─── */
-    radioOuter: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        borderWidth: 2,
+    /* ─── Checkbox Square ─── */
+    checkboxSquare: {
+        width: 20,
+        height: 20,
+        borderRadius: 6,
+        borderWidth: 1.5,
         borderColor: '#3F3F46',
+        backgroundColor: '#141418',
         alignItems: 'center',
         justifyContent: 'center',
         marginLeft: 12,
     },
-    radioOuterSelected: {
-        borderColor: colors.accentGold,
-    },
-    radioInner: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
+    checkboxSquareSelected: {
         backgroundColor: colors.accentGold,
+        borderColor: colors.accentGold,
     },
 
     /* ─── Separator ─── */

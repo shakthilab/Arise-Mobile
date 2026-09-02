@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     tipContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: 'rgba(229, 169, 60, 0.08)',
+        backgroundColor: 'rgba(254, 91, 1, 0.08)',
         borderRadius: 10,
         paddingVertical: 14,
         paddingHorizontal: 16,

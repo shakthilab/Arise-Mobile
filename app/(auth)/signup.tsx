@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { resendOtp, verifyOtp } from '@/services/api/auth.service';
 import { isGoogleSignInCancelled, signInWithGoogle } from '@/services/auth/googleAuth';
 import { buildOnboardingAnswers, useOnboardingStore } from '@/store/useOnboardingStore';
+import { showGlobalToast } from '@/store/useToastStore';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 
@@ -228,8 +229,13 @@ export default function SignupScreen() {
     try {
       await signup(registerPayload);
       router.replace('/(onboarding)/ascension');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Signup failed');
+    } catch (err: any) {
+      const errMsg = err instanceof Error ? err.message : 'Signup failed';
+      if (errMsg.toLowerCase().includes('already exist') || errMsg.toLowerCase().includes('already registered')) {
+        showGlobalToast('User Account is already exist', 'info');
+      } else {
+        setError(errMsg);
+      }
     }
   };
 
@@ -239,10 +245,25 @@ export default function SignupScreen() {
     try {
       const idToken = await signInWithGoogle();
       const { isNew } = await loginWithGoogle(idToken, buildOnboardingAnswers());
-      router.replace(isNew ? '/(onboarding)/ascension' : '/(tabs)');
+      if (isNew) {
+        router.replace('/(onboarding)/ascension');
+      } else {
+        router.replace('/(tabs)');
+        setTimeout(() => {
+          showGlobalToast('User Account is already exist', 'info');
+        }, 350);
+      }
     } catch (err) {
       if (!isGoogleSignInCancelled(err)) {
-        setError(err instanceof Error ? err.message : 'Google sign-in failed');
+        const errMsg = err instanceof Error ? err.message : 'Google sign-in failed';
+        if (errMsg.toLowerCase().includes('already exist') || errMsg.toLowerCase().includes('already registered')) {
+          router.replace('/(tabs)');
+          setTimeout(() => {
+            showGlobalToast('User Account is already exist', 'info');
+          }, 350);
+        } else {
+          setError(errMsg);
+        }
       }
     } finally {
       setIsGoogleLoading(false);

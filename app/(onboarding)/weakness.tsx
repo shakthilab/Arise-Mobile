@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     },
     optionBoxSelected: {
         borderColor: colors.accentGold,
-        backgroundColor: 'rgba(229, 169, 60, 0.08)',
+        backgroundColor: 'rgba(254, 91, 1, 0.08)',
     },
     optionBoxDisabled: {
         opacity: 0.5,

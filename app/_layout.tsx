@@ -19,6 +19,8 @@ import {
 
 import { colors } from '@/theme/colors';
 import { useAuthStore } from '@/store/useAuthStore';
+import { GlobalToast } from '@/components/common/GlobalToast';
+import { preloadAppAssets } from '@/services/media/preloadAssets';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,11 +39,10 @@ export default function RootLayout() {
     Inter_700Bold_Italic,
   });
 
-  // Runs once on app start — reads the persisted access token (if any) and
-  // fetches the user it belongs to, so a page refresh/relaunch stays logged
-  // in instead of bouncing to /login just because in-memory state reset.
+  // Runs once on app start — reads the persisted access token and warms image cache
   useEffect(() => {
     useAuthStore.getState().restoreSession();
+    preloadAppAssets();
   }, []);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="+not-found" />
         </Stack>
+        <GlobalToast />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

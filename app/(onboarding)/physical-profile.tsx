@@ -458,9 +458,9 @@ export default function PhysicalProfileScreen() {
           {/* Touch-Scrollable Circular Target Gauge Dial */}
           <View style={styles.dialWrapper} {...dialPanResponder.panHandlers}>
             <View style={styles.dialCircle}>
-              {/* Radial subtle ambient gold glow */}
+              {/* Radial subtle ambient orange glow */}
               <LinearGradient
-                colors={['transparent', 'rgba(229, 169, 60, 0.08)', 'rgba(229, 169, 60, 0.22)']}
+                colors={['transparent', 'rgba(254, 91, 1, 0.08)', 'rgba(254, 91, 1, 0.22)']}
                 style={styles.dialGradientGlow}
               />
 

@@ -19,6 +19,8 @@ import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { useAuth } from '@/hooks/useAuth';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import { playIntroAudio } from '@/services/audio/introSound';
+import * as Haptics from 'expo-haptics';
 
 export default function AscensionScreen() {
   const { completeOnboarding } = useAuth();
@@ -44,8 +46,10 @@ export default function AscensionScreen() {
   }, [fadeAnim, slideAnim]);
 
   const handleStart = () => {
+    // Trigger intro audio with synchronized haptic sequence on button press
+    playIntroAudio(true);
     completeOnboarding();
-    router.replace('/(tabs)');
+    router.replace('/(tabs)?fromAscension=true');
   };
 
   return (

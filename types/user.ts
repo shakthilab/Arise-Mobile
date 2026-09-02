@@ -1,3 +1,15 @@
+export type WeekStatusDay = {
+  date: string;
+  day: string;
+  status: 'DONE' | 'COMPLETED' | 'MISSED' | 'FAILED' | 'SKIPPED' | 'NOT_STARTED' | 'REST' | 'FREEZE' | string;
+};
+
+export type WeekStatus = {
+  week_start: string;
+  week_end: string;
+  days: WeekStatusDay[];
+};
+
 export type User = {
   id: string;
   displayName: string;
@@ -24,6 +36,7 @@ export type User = {
     longest_streak?: number;
     last_active_date?: string;
   };
+  week_status?: WeekStatus;
 };
 
 export type AuthSession = {

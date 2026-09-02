@@ -19,6 +19,7 @@ import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
 import { useAuth } from '@/hooks/useAuth';
 import { buildOnboardingAnswers, useOnboardingStore } from '@/store/useOnboardingStore';
+import { showGlobalToast } from '@/store/useToastStore';
 
 const TOTAL_STEPS = 8;
 const CURRENT_STEP = 7; // eighth step (0-indexed)
@@ -82,8 +83,16 @@ export default function OathScreen() {
             try {
                 await submitOnboarding(buildOnboardingAnswers());
                 router.replace('/(onboarding)/ascension');
-            } catch (err) {
-                setSubmitError(err instanceof Error ? err.message : 'Could not save your answers');
+            } catch (err: any) {
+                const errMsg = err instanceof Error ? err.message : 'Could not save your answers';
+                if (errMsg.toLowerCase().includes('already exist') || errMsg.toLowerCase().includes('already registered')) {
+                    router.replace('/(tabs)');
+                    setTimeout(() => {
+                        showGlobalToast('User Account is already exist', 'info');
+                    }, 350);
+                } else {
+                    setSubmitError(errMsg);
+                }
             } finally {
                 setIsSubmitting(false);
             }

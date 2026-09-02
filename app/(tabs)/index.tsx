@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Animated,
+  Easing,
   Image,
   ImageBackground,
   Pressable,
@@ -12,6 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -254,8 +256,28 @@ function AnimatedWrongButton({ onPress }: { onPress: () => void }) {
 export default function MissionsHomeScreen() {
   const { user } = useAuth();
   const { lastDrop, roll } = useLootDrop();
+  const params = useLocalSearchParams<{ fromAscension?: string }>();
+  const isFromAscension = params.fromAscension === 'true';
+
   const [dropVisible, setDropVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'todo' | 'done' | 'skipped'>('todo');
+
+  // Cinematic black overlay fade-out matching the intro audio after onboarding
+  const [showBlackIntroOverlay, setShowBlackIntroOverlay] = useState(isFromAscension);
+  const blackFadeAnim = useRef(new Animated.Value(isFromAscension ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (isFromAscension) {
+      Animated.timing(blackFadeAnim, {
+        toValue: 0,
+        duration: 2400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setShowBlackIntroOverlay(false);
+      });
+    }
+  }, [isFromAscension, blackFadeAnim]);
 
   const [quests, setQuests] = useState<QuestItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -304,7 +326,11 @@ export default function MissionsHomeScreen() {
   const displayXP = (user?.xp ?? 1240).toLocaleString();
   const displayLevel = user?.level ?? 8;
   const displayStreak = user?.currentStreak ?? user?.user_progression?.daily_streak ?? 16;
-  const completedDays = user?.completedDaysCount ?? user?.weeklyStreak ?? user?.user_progression?.weekly_streak ?? (displayStreak > 0 ? Math.min(displayStreak, 7) : 5);
+  const completedDays =
+    user?.completedDaysCount ??
+    (user?.week_status?.days
+      ? user.week_status.days.filter((d) => d.status === 'DONE' || d.status === 'COMPLETED').length
+      : user?.weeklyStreak ?? user?.user_progression?.weekly_streak ?? (displayStreak > 0 ? Math.min(displayStreak, 7) : 1));
 
   const getQuestTargetValue = (quest: QuestItem) => {
     if (quest.targetValue) {
@@ -546,11 +572,11 @@ export default function MissionsHomeScreen() {
         {/* ACTIVE CAMPAIGN SECTION */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitleWide}>ACTIVE CAMPAIGN</Text>
-          <Text style={styles.dayCounterText}>Day 01 / 100</Text>
         </View>
 
         {/* WEEKLY TRACKER (2ND ITEM) */}
         <WeeklyTracker
+          weekStatus={user?.week_status}
           streakDays={displayStreak}
           completedDaysCount={completedDays}
           avatarUrl={user?.avatarUrl}
@@ -972,6 +998,21 @@ export default function MissionsHomeScreen() {
         <DayCompleteScreen
           quests={quests}
           onContinue={() => setDayCompleteModalVisible(false)}
+        />
+      )}
+
+      {/* Full-Screen Black View Fade-Out (Matches Intro Audio) */}
+      {showBlackIntroOverlay && (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              backgroundColor: '#000000',
+              opacity: blackFadeAnim,
+              zIndex: 99999,
+            },
+          ]}
+          pointerEvents="none"
         />
       )}
     </Screen>

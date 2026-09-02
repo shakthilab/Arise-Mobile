@@ -17,6 +17,9 @@ export function mapBackendUserToUser(u: any): User {
   const progression = u.user_progression || {};
   const dailyStreak = u.currentStreak ?? progression.daily_streak ?? 0;
   const weeklyStreak = u.weeklyStreak ?? progression.weekly_streak ?? (dailyStreak > 0 ? Math.min(dailyStreak, 7) : 0);
+  const weekStatusCompletedCount = u.week_status?.days
+    ? u.week_status.days.filter((d: any) => d.status === 'DONE' || d.status === 'COMPLETED').length
+    : undefined;
   return {
     ...u,
     id: u.id ? u.id.toString() : '',
@@ -27,8 +30,9 @@ export function mapBackendUserToUser(u: any): User {
     currentStreak: dailyStreak,
     longestStreak: u.longestStreak ?? progression.longest_streak ?? 0,
     weeklyStreak,
-    completedDaysCount: u.completedDaysCount ?? weeklyStreak,
+    completedDaysCount: u.completedDaysCount ?? weekStatusCompletedCount ?? weeklyStreak,
     user_progression: progression,
+    week_status: u.week_status,
   };
 }
 

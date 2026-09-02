@@ -6,16 +6,23 @@ import Svg, { Circle } from 'react-native-svg';
 import { fontFamilies } from '@/theme/typography';
 import { getAvatarSource } from '@/app/(tabs)/profile';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import type { WeekStatus } from '@/types/user';
+
+export type DayStatus = 'completed' | 'today' | 'missed' | 'locked' | 'freeze';
 
 export interface DayTrackerItem {
   dayName: string;
   dateNum: string;
-  status: 'completed' | 'today' | 'locked';
+  dateStr?: string;
+  status: DayStatus;
   isToday?: boolean;
+  isDone?: boolean;
+  rawStatus?: string;
 }
 
 interface WeeklyTrackerProps {
   days?: DayTrackerItem[];
+  weekStatus?: WeekStatus | null;
   streakDays?: number;
   completedDaysCount?: number;
   totalDaysCount?: number;
@@ -23,6 +30,103 @@ interface WeeklyTrackerProps {
   characterImageSource?: any;
   avatarUrl?: string | null;
   onDayPress?: (day: DayTrackerItem) => void;
+}
+
+function getLocalTodayDateStr(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateNum(dateStr?: string, fallbackIndex = 0): string {
+  if (!dateStr) return String(fallbackIndex + 1).padStart(2, '0');
+  if (dateStr.includes('-')) {
+    const dayPart = dateStr.split('T')[0].split('-')[2];
+    if (dayPart) return dayPart.padStart(2, '0');
+  }
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return String(parsed.getDate()).padStart(2, '0');
+  }
+  return String(fallbackIndex + 1).padStart(2, '0');
+}
+
+export function generateWeekDaysFromWeekStatus(
+  weekStatus?: WeekStatus | null,
+  fallbackCompletedCount?: number
+): DayTrackerItem[] {
+  const todayDateStr = getLocalTodayDateStr();
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const distanceToMon = (dayOfWeek + 6) % 7; // 0 for Mon, 6 for Sun
+
+  if (weekStatus?.days && Array.isArray(weekStatus.days) && weekStatus.days.length > 0) {
+    const dayAbbrevMap: Record<string, string> = {
+      MONDAY: 'MON',
+      TUESDAY: 'TUE',
+      WEDNESDAY: 'WED',
+      THURSDAY: 'THU',
+      FRIDAY: 'FRI',
+      SATURDAY: 'SAT',
+      SUNDAY: 'SUN',
+      MON: 'MON',
+      TUE: 'TUE',
+      WED: 'WED',
+      THU: 'THU',
+      FRI: 'FRI',
+      SAT: 'SAT',
+      SUN: 'SUN',
+    };
+
+    const hasTodayMatch = weekStatus.days.some((d) => d.date === todayDateStr);
+
+    return weekStatus.days.map((d, index) => {
+      const dayUpper = (d.day || '').toUpperCase();
+      const dayName = dayAbbrevMap[dayUpper] || dayUpper.slice(0, 3) || 'DAY';
+      const dateNum = parseDateNum(d.date, index);
+
+      const isToday = hasTodayMatch ? d.date === todayDateStr : index === distanceToMon;
+      const statusUpper = (d.status || '').toUpperCase();
+      const isDone = statusUpper === 'DONE' || statusUpper === 'COMPLETED';
+      const isMissed = statusUpper === 'MISSED' || statusUpper === 'FAILED' || statusUpper === 'SKIPPED';
+      const isFreeze = statusUpper === 'FREEZE' || statusUpper === 'FROZEN' || statusUpper === 'REST';
+
+      let status: DayStatus = 'locked';
+
+      if (isToday) {
+        status = 'today';
+      } else if (isDone) {
+        status = 'completed';
+      } else if (isFreeze) {
+        status = 'freeze';
+      } else if (isMissed) {
+        status = 'missed';
+      } else {
+        // Status is NOT_STARTED or PENDING
+        // If it falls before today, it is considered a left / missed day
+        const isPast = d.date ? d.date < todayDateStr : index < distanceToMon;
+        if (isPast) {
+          status = 'missed';
+        } else {
+          status = 'locked';
+        }
+      }
+
+      return {
+        dayName,
+        dateNum,
+        dateStr: d.date,
+        status,
+        isToday,
+        isDone,
+        rawStatus: d.status,
+      };
+    });
+  }
+
+  return generateCurrentWeekDays(fallbackCompletedCount);
 }
 
 export function generateCurrentWeekDays(completedCount?: number): DayTrackerItem[] {
@@ -41,12 +145,13 @@ export function generateCurrentWeekDays(completedCount?: number): DayTrackerItem
     d.setDate(monday.getDate() + i);
     const dateNum = String(d.getDate()).padStart(2, '0');
     const isToday = i === distanceToMon;
+    const isDone = i < targetCompletedCount;
 
-    let status: 'completed' | 'today' | 'locked' = 'locked';
+    let status: DayStatus = 'locked';
     if (isToday) {
       status = 'today';
-    } else if (i < distanceToMon && i < targetCompletedCount) {
-      status = 'completed';
+    } else if (i < distanceToMon) {
+      status = isDone ? 'completed' : 'missed';
     } else {
       status = 'locked';
     }
@@ -56,6 +161,7 @@ export function generateCurrentWeekDays(completedCount?: number): DayTrackerItem
       dateNum,
       status,
       isToday,
+      isDone,
     };
   });
 }
@@ -64,6 +170,7 @@ const DEFAULT_CHARACTER_IMAGE = CLOUDINARY_ASSETS.high_fidelity;
 
 export function WeeklyTracker({
   days,
+  weekStatus,
   streakDays = 5,
   completedDaysCount,
   totalDaysCount = 7,
@@ -74,20 +181,23 @@ export function WeeklyTracker({
 }: WeeklyTrackerProps) {
   const activeDays = useMemo(() => {
     if (days && days.length > 0) return days;
-    return generateCurrentWeekDays(completedDaysCount);
-  }, [days, completedDaysCount]);
+    return generateWeekDaysFromWeekStatus(weekStatus, completedDaysCount);
+  }, [days, weekStatus, completedDaysCount]);
 
-  const completedCount =
-    completedDaysCount ?? activeDays.filter(d => d.status === 'completed' || d.status === 'today').length;
+  const completedCount = useMemo(() => {
+    if (completedDaysCount !== undefined) return completedDaysCount;
+    return activeDays.filter((d) => d.status === 'completed' || (d.isToday && d.isDone)).length;
+  }, [completedDaysCount, activeDays]);
+
   const imageSource =
     typeof characterImageSource === 'string' ? { uri: characterImageSource } : characterImageSource;
 
   // Calculate active index for the timeline connecting path line
   const activeIndex = useMemo(() => {
-    const todayIdx = activeDays.findIndex(d => d.isToday || d.status === 'today');
+    const todayIdx = activeDays.findIndex((d) => d.isToday || d.status === 'today');
     if (todayIdx !== -1) return todayIdx;
     for (let i = activeDays.length - 1; i >= 0; i--) {
-      if (activeDays[i].status === 'completed') return i;
+      if (activeDays[i].status === 'completed' || activeDays[i].isDone) return i;
     }
     return 0;
   }, [activeDays]);
@@ -108,7 +218,7 @@ export function WeeklyTracker({
   }, [completedRatio]);
 
   // Node horizontal margins for 7 items
-  const nodeMarginPercent = (1 / (2 * totalDays)) * 100; // ~7.14%
+  const nodeMarginPercent = (1 / (2 * (totalDays || 7))) * 100; // ~7.14%
 
   // Circular Progress calculations
   const radius = 20;
@@ -158,7 +268,6 @@ export function WeeklyTracker({
         <View style={styles.daysRow}>
           {activeDays.map((item, index) => {
             const isToday = item.isToday || item.status === 'today';
-            const isCompleted = item.status === 'completed';
 
             if (isToday) {
               return (
@@ -170,9 +279,15 @@ export function WeeklyTracker({
                   <Text style={styles.todayDayName}>{item.dayName}</Text>
 
                   {/* Circle Node inside TODAY card */}
-                  <View style={styles.todayCircleNode}>
-                    <Ionicons name="checkmark" size={16} color="#FE5B01" />
-                  </View>
+                  {item.isDone ? (
+                    <View style={styles.todayCircleNodeCompleted}>
+                      <Ionicons name="checkmark" size={16} color="#FE5B01" />
+                    </View>
+                  ) : (
+                    <View style={styles.todayCircleNodePending}>
+                      <View style={styles.todayPendingDot} />
+                    </View>
+                  )}
 
                   <Text style={styles.todayDateNum}>{item.dateNum}</Text>
 
@@ -184,26 +299,67 @@ export function WeeklyTracker({
               );
             }
 
+            // Normal Day - Completed
+            if (item.status === 'completed' || item.isDone) {
+              return (
+                <Pressable
+                  key={index}
+                  style={styles.normalDayColumn}
+                  onPress={() => onDayPress?.(item)}
+                >
+                  <Text style={styles.completedDayName}>{item.dayName}</Text>
+                  <View style={styles.completedCircle}>
+                    <Ionicons name="checkmark" size={14} color="#FE5B01" />
+                  </View>
+                  <Text style={styles.completedDateNum}>{item.dateNum}</Text>
+                </Pressable>
+              );
+            }
+
+            // Normal Day - Missed / Left Day (Hollow Dashed Ghost Ring)
+            if (item.status === 'missed') {
+              return (
+                <Pressable
+                  key={index}
+                  style={styles.normalDayColumn}
+                  onPress={() => onDayPress?.(item)}
+                >
+                  <Text style={styles.missedDayName}>{item.dayName}</Text>
+                  <View style={styles.missedCircle} />
+                  <Text style={styles.missedDateNum}>{item.dateNum}</Text>
+                </Pressable>
+              );
+            }
+
+            // Normal Day - Frozen / Rest Day
+            if (item.status === 'freeze') {
+              return (
+                <Pressable
+                  key={index}
+                  style={styles.normalDayColumn}
+                  onPress={() => onDayPress?.(item)}
+                >
+                  <Text style={styles.freezeDayName}>{item.dayName}</Text>
+                  <View style={styles.freezeCircle}>
+                    <MaterialCommunityIcons name="snowflake" size={13} color="#38BDF8" />
+                  </View>
+                  <Text style={styles.freezeDateNum}>{item.dateNum}</Text>
+                </Pressable>
+              );
+            }
+
+            // Normal Day - Upcoming Day (Locked)
             return (
               <Pressable
                 key={index}
                 style={styles.normalDayColumn}
                 onPress={() => onDayPress?.(item)}
               >
-                <Text style={styles.normalDayName}>{item.dayName}</Text>
-
-                {/* Status Circle Node */}
-                {isCompleted ? (
-                  <View style={styles.completedCircle}>
-                    <Ionicons name="checkmark" size={14} color="#FE5B01" />
-                  </View>
-                ) : (
-                  <View style={styles.lockedCircle}>
-                    <Ionicons name="lock-closed" size={12} color="#52525B" />
-                  </View>
-                )}
-
-                <Text style={styles.normalDateNum}>{item.dateNum}</Text>
+                <Text style={styles.lockedDayName}>{item.dayName}</Text>
+                <View style={styles.lockedCircle}>
+                  <Ionicons name="lock-closed" size={12} color="#52525B" />
+                </View>
+                <Text style={styles.lockedDateNum}>{item.dateNum}</Text>
               </Pressable>
             );
           })}
@@ -286,14 +442,21 @@ export function WeeklyTracker({
 
         {/* BOTTOM SEGMENTED PROGRESS BAR */}
         <View style={styles.segmentedBarRow}>
-          {Array.from({ length: totalDaysCount }).map((_, index) => {
-            const isFilled = index < completedCount;
+          {activeDays.map((dayItem, index) => {
+            let segColor = '#26262E';
+            if (dayItem.status === 'completed' || (dayItem.isToday && dayItem.isDone)) {
+              segColor = '#FE5B01';
+            } else if (dayItem.status === 'missed') {
+              segColor = '#451A1A';
+            } else if (dayItem.status === 'freeze') {
+              segColor = '#0284C7';
+            }
             return (
               <View
                 key={index}
                 style={[
                   styles.segmentBarItem,
-                  { backgroundColor: isFilled ? '#FE5B01' : '#26262E' },
+                  { backgroundColor: segColor },
                 ]}
               />
             );
@@ -439,7 +602,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  normalDayName: {
+
+  /* COMPLETED DAY */
+  completedDayName: {
     fontFamily: fontFamilies.medium,
     fontSize: 11,
     color: '#FFFFFF',
@@ -451,14 +616,82 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     borderWidth: 1.5,
     borderColor: '#FE5B01',
-    backgroundColor: '#0F0F12',
+    backgroundColor: '#1E120A',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
     shadowColor: '#FE5B01',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.5,
     shadowRadius: 4,
+    elevation: 3,
+  },
+  completedDateNum: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+
+  /* MISSED / LEFT DAY (Hollow Dashed Outline) */
+  missedDayName: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 11,
+    color: '#71717A',
+    marginBottom: 8,
+  },
+  missedCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#52525B',
+    backgroundColor: '#121216',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  missedDateNum: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    color: '#71717A',
+  },
+
+  /* FROZEN / REST DAY */
+  freezeDayName: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 11,
+    color: '#38BDF8',
+    marginBottom: 8,
+  },
+  freezeCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: '#0284C7',
+    backgroundColor: '#082F49',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  freezeDateNum: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 12,
+    color: '#BAE6FD',
+  },
+
+  /* LOCKED / UPCOMING DAY */
+  lockedDayName: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 11,
+    color: '#71717A',
+    marginBottom: 8,
   },
   lockedCircle: {
     width: 34,
@@ -471,10 +704,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  normalDateNum: {
+  lockedDateNum: {
     fontFamily: fontFamilies.medium,
     fontSize: 12,
-    color: '#FFFFFF',
+    color: '#71717A',
   },
 
   /* TODAY HIGHLIGHT CARD */
@@ -506,7 +739,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4,
   },
-  todayCircleNode: {
+  todayCircleNodeCompleted: {
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -520,6 +753,34 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
+    elevation: 4,
+  },
+  todayCircleNodePending: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: '#FE5B01',
+    backgroundColor: '#2A170D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    shadowColor: '#FE5B01',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  todayPendingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FE5B01',
+    shadowColor: '#FE5B01',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   todayDateNum: {
     fontFamily: fontFamilies.bold,

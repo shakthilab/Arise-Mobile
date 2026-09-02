@@ -13,8 +13,10 @@ export const palette = {
 
   blue: '#5B8CFF',
   purple: '#9D4EDD',
-  gold: '#E5A93C',
-  goldMuted: '#C5A059',
+  orange: '#FE5B01',
+  orangeMuted: 'rgba(254, 91, 1, 0.65)',
+  gold: '#FE5B01',
+  goldMuted: '#FF7A00',
   red: '#FF4D6D',
   green: '#3DDC97',
 } as const;
@@ -31,21 +33,21 @@ export const colors = {
 
   accentPrimary: palette.white,
   accentSecondary: palette.purple,
-  accentGold: palette.gold,
-  accentGoldMuted: palette.goldMuted,
+  accentOrange: palette.orange,
+  accentGold: palette.orange,
+  accentGoldMuted: palette.orangeMuted,
 
   success: palette.green,
   danger: palette.red,
-  warning: palette.gold,
+  warning: palette.orange,
 
   // Loot / achievement rarity tiers
   rarity: {
     common: palette.slate300,
     rare: palette.blue,
     epic: palette.purple,
-    legendary: palette.gold,
+    legendary: palette.orange,
   },
 } as const;
 
 export type AppColors = typeof colors;
-
