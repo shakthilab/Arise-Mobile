@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   Modal,
@@ -17,7 +18,7 @@ import { GoogleIcon } from '@/components/common/GoogleIcon';
 import { HunterToast } from '@/components/common/HunterToast';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
-import { getAvatarSource } from './AvatarSelectionModal';
+import { AvatarSelectionModal, getAvatarSource } from './AvatarSelectionModal';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -33,11 +34,21 @@ const formatBirthday = (dob: string | null | undefined): string => {
     const parts = dob.split('/');
     return `${parts[0]}/${parts[1]}/${parts[2].slice(-2)}`;
   }
+  if (typeof dob === 'string' && dob.includes('-')) {
+    const dateStr = dob.split('T')[0];
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parts[0].slice(-2);
+      const month = parts[1];
+      const day = parts[2];
+      return `${day}/${month}/${year}`;
+    }
+  }
   const date = new Date(dob);
   if (!isNaN(date.getTime())) {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const shortYear = String(date.getFullYear()).slice(-2);
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const shortYear = String(date.getUTCFullYear()).slice(-2);
     return `${day}/${month}/${shortYear}`;
   }
   return dob;
@@ -52,6 +63,8 @@ export interface EditProfileFormData {
   weight: string;
   weightUnit: 'kg' | 'lbs';
   protein: string;
+  avatar_id?: number | string;
+  avatar_url?: string;
 }
 
 export interface EditProfileModalProps {
@@ -59,8 +72,8 @@ export interface EditProfileModalProps {
   onClose: () => void;
   user: any;
   unitSystem: 'metric' | 'imperial';
-  onSave: (updatedForm: EditProfileFormData) => void;
-  onOpenAvatarPicker: () => void;
+  onSave: (updatedForm: EditProfileFormData) => Promise<void> | void;
+  onOpenAvatarPicker?: () => void;
   onDeleteAccount: () => void;
 }
 
@@ -97,6 +110,18 @@ export function EditProfileModal({
 
   const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
 
+  // Avatar picker state
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string | number | null>(
+    user?.avatar_id ?? null
+  );
+  const [initialAvatarId, setInitialAvatarId] = useState<string | number | null>(
+    user?.avatar_id ?? null
+  );
+  const [selectedAvatarUrl, setSelectedAvatarUrl] = useState<string | null>(
+    user?.avatarUrl ?? null
+  );
+  const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
+
   // Date picker state
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [pickerMode, setPickerMode] = useState<'DAY' | 'MONTH' | 'YEAR'>('DAY');
@@ -111,8 +136,8 @@ export function EditProfileModal({
 
   useEffect(() => {
     if (visible && user) {
-      const heightInCm = user?.height ?? 181;
-      const weightInKg = user?.weight ?? 75;
+      const heightInCm = user?.height_cm ?? user?.height ?? 181;
+      const weightInKg = user?.weight_kg ?? user?.weight ?? 75;
       const isImp = unitSystem === 'imperial';
 
       const heightDisplay = isImp
@@ -123,31 +148,63 @@ export function EditProfileModal({
         : weightInKg.toString();
 
       const newForm: EditProfileFormData = {
-        name: user?.displayName || user?.name || 'Shadow Hunter',
+        name: user?.name || user?.displayName || 'Shadow Hunter',
         gender: user?.gender || 'Male',
-        birthday: formatBirthday(user?.dob || user?.birthday || '15/06/98'),
+        birthday: formatBirthday(user?.date_of_birth || user?.dob || user?.birthday || '15/06/98'),
         height: heightDisplay,
         heightUnit: isImp ? 'ft' : 'cm',
         weight: weightDisplay,
         weightUnit: isImp ? 'lbs' : 'kg',
-        protein: user?.protein_goal ? String(user.protein_goal) : '140',
+        protein: String(user?.daily_protein_goal ?? user?.protein_goal ?? 140),
+        avatar_id: user?.avatar_id ?? undefined,
+        avatar_url: user?.avatarUrl ?? undefined,
       };
 
       setProfileForm(newForm);
       setInitialForm(newForm);
+      setSelectedAvatarId(user?.avatar_id ?? null);
+      setInitialAvatarId(user?.avatar_id ?? null);
+      setSelectedAvatarUrl(user?.avatarUrl ?? null);
       setIsGenderDropdownOpen(false);
       setIsDatePickerVisible(false);
+      setIsAvatarModalVisible(false);
     }
   }, [visible, user, unitSystem]);
 
+  const currentHeightCm = React.useMemo(() => {
+    const val = parseFloat(profileForm.height);
+    if (isNaN(val)) return 0;
+    return profileForm.heightUnit === 'ft' ? Math.round(val / 0.0328084) : Math.round(val);
+  }, [profileForm.height, profileForm.heightUnit]);
+
+  const initialHeightCm = React.useMemo(() => {
+    const val = parseFloat(initialForm.height);
+    if (isNaN(val)) return 0;
+    return initialForm.heightUnit === 'ft' ? Math.round(val / 0.0328084) : Math.round(val);
+  }, [initialForm.height, initialForm.heightUnit]);
+
+  const currentWeightKg = React.useMemo(() => {
+    const val = parseFloat(profileForm.weight);
+    if (isNaN(val)) return 0;
+    return profileForm.weightUnit === 'lbs' ? Math.round((val / 2.20462) * 10) / 10 : Math.round(val * 10) / 10;
+  }, [profileForm.weight, profileForm.weightUnit]);
+
+  const initialWeightKg = React.useMemo(() => {
+    const val = parseFloat(initialForm.weight);
+    if (isNaN(val)) return 0;
+    return initialForm.weightUnit === 'lbs' ? Math.round((val / 2.20462) * 10) / 10 : Math.round(val * 10) / 10;
+  }, [initialForm.weight, initialForm.weightUnit]);
+
+  const isHeightChanged = Math.abs(currentHeightCm - initialHeightCm) > 1;
+  const isWeightChanged = Math.abs(currentWeightKg - initialWeightKg) > 0.3;
+
   const isProfileChanged =
-    profileForm.name !== initialForm.name ||
+    profileForm.name.trim() !== initialForm.name.trim() ||
     profileForm.gender !== initialForm.gender ||
     profileForm.birthday !== initialForm.birthday ||
-    profileForm.height !== initialForm.height ||
-    profileForm.heightUnit !== initialForm.heightUnit ||
-    profileForm.weight !== initialForm.weight ||
-    profileForm.weightUnit !== initialForm.weightUnit;
+    isHeightChanged ||
+    isWeightChanged ||
+    String(selectedAvatarId ?? '') !== String(initialAvatarId ?? '');
 
   const handleProteinRowPress = () => {
     setProteinToastVisible(true);
@@ -186,13 +243,31 @@ export function EditProfileModal({
     setIsDatePickerVisible(false);
   };
 
-  const handleSave = () => {
-    if (!profileForm.name.trim()) return;
-    onSave(profileForm);
-    onClose();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!profileForm.name.trim() || isSaving) return;
+    try {
+      setIsSaving(true);
+      await onSave({
+        ...profileForm,
+        avatar_id: selectedAvatarId !== null && selectedAvatarId !== undefined ? selectedAvatarId : undefined,
+        avatar_url: selectedAvatarUrl || undefined,
+      });
+      setInitialForm(profileForm);
+      setInitialAvatarId(selectedAvatarId);
+      // Keep modal open as requested; user will explicitly tap back/close button
+    } catch {
+      // Error handles inside onSave alert
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const currentAvatarSource = getAvatarSource(user?.avatarUrl);
+  const currentAvatarSource = getAvatarSource(
+    selectedAvatarUrl || user?.avatarUrl,
+    selectedAvatarId || user?.avatar_id
+  );
   const providerStr =
     user?.provider ?? user?.authProvider ?? user?.auth_provider ?? 'EMAIL';
   const p = String(providerStr).toUpperCase();
@@ -209,6 +284,7 @@ export function EditProfileModal({
           <TouchableOpacity
             style={styles.editBackBtn}
             onPress={onClose}
+            disabled={isSaving}
             activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
@@ -216,18 +292,22 @@ export function EditProfileModal({
           <Text style={styles.editProfileTitle}>Edit Profile</Text>
           <TouchableOpacity
             style={styles.editSaveBtn}
-            onPress={isProfileChanged ? handleSave : undefined}
-            disabled={!isProfileChanged}
+            onPress={isProfileChanged && !isSaving ? handleSave : undefined}
+            disabled={!isProfileChanged || isSaving}
             activeOpacity={0.7}
           >
-            <Text
-              style={[
-                styles.saveActionText,
-                !isProfileChanged && styles.saveActionTextDisabled,
-              ]}
-            >
-              SAVE
-            </Text>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FE5B01" />
+            ) : (
+              <Text
+                style={[
+                  styles.saveActionText,
+                  !isProfileChanged && styles.saveActionTextDisabled,
+                ]}
+              >
+                SAVE
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -239,7 +319,7 @@ export function EditProfileModal({
           <View style={styles.editAvatarCenterSection}>
             <TouchableOpacity
               style={styles.editAvatarCircleWrapper}
-              onPress={onOpenAvatarPicker}
+              onPress={() => setIsAvatarModalVisible(true)}
               activeOpacity={0.85}
             >
               <LinearGradient
@@ -789,6 +869,18 @@ export function EditProfileModal({
           message="You cannot edit protein goal"
           type="info"
           onHide={() => setProteinToastVisible(false)}
+        />
+
+        <AvatarSelectionModal
+          visible={isAvatarModalVisible}
+          onClose={() => setIsAvatarModalVisible(false)}
+          currentAvatar={selectedAvatarUrl || user?.avatarUrl}
+          currentAvatarId={selectedAvatarId || user?.avatar_id}
+          onSelectAvatar={(avatarId, avatarUrl) => {
+            setSelectedAvatarId(avatarId);
+            setSelectedAvatarUrl(avatarUrl);
+            setIsAvatarModalVisible(false);
+          }}
         />
       </Screen>
     </Modal>

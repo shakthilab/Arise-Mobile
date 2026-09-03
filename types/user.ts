@@ -13,6 +13,7 @@ export type WeekStatus = {
 export type User = {
   id: string;
   displayName: string;
+  name?: string;
   email: string;
   avatarUrl: string | null;
   level: number;
@@ -20,11 +21,17 @@ export type User = {
   currentStreak: number;
   longestStreak: number;
   createdAt: string;
-  // Present on the real backend response (GET /auth/me, login, etc.) but
-  // optional here since callers elsewhere construct partial/placeholder
-  // User objects that predate this field.
-  onboarding_done?: boolean;
+  gender?: string;
+  height_cm?: number;
+  weight_kg?: number;
+  height?: number;
+  weight?: number;
+  date_of_birth?: string;
+  dob?: string;
+  birthday?: string;
   daily_protein_goal?: number | null;
+  protein_goal?: number | null;
+  onboarding_done?: boolean;
   weeklyStreak?: number;
   completedDaysCount?: number;
   user_progression?: {

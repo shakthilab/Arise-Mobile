@@ -118,17 +118,17 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
   const eggScale = useSharedValue(0.7);
   const eggRotationY = useSharedValue(0);
   const scrimOpacity = useSharedValue(0);
-  
+
   const glowScale = useSharedValue(0.5);
   const glowOpacity = useSharedValue(0);
   const goldTintOpacity = useSharedValue(0);
   const veinBrightness = useSharedValue(0.5);
-  
+
   const flashOpacity = useSharedValue(0);
   const particleProgress = useSharedValue(0);
   const cameraShakeX = useSharedValue(0);
   const cameraShakeY = useSharedValue(0);
-  
+
   const cardTranslateY = useSharedValue(400);
   const cardOpacity = useSharedValue(0);
   const counterProgress = useSharedValue(0);
@@ -143,7 +143,7 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
           playsInSilentModeIOS: true,
           staysActiveInBackground: false,
           playThroughEarpieceAndroid: false,
-        }).catch(() => {});
+        }).catch(() => { });
 
         // Safely load and initialize all assets (silent fallback for missing files)
         const loadSoundAsset = async (requirePath: any, isLoop = false) => {
@@ -182,12 +182,12 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
       active = false;
       const unload = async () => {
         const { thud, whoosh, charge, chime, tick, settle } = soundsRef.current;
-        if (thud) await thud.unloadAsync().catch(() => {});
-        if (whoosh) await whoosh.unloadAsync().catch(() => {});
-        if (charge) await charge.unloadAsync().catch(() => {});
-        if (chime) await chime.unloadAsync().catch(() => {});
-        if (tick) await tick.unloadAsync().catch(() => {});
-        if (settle) await settle.unloadAsync().catch(() => {});
+        if (thud) await thud.unloadAsync().catch(() => { });
+        if (whoosh) await whoosh.unloadAsync().catch(() => { });
+        if (charge) await charge.unloadAsync().catch(() => { });
+        if (chime) await chime.unloadAsync().catch(() => { });
+        if (tick) await tick.unloadAsync().catch(() => { });
+        if (settle) await settle.unloadAsync().catch(() => { });
       };
       unload();
     };
@@ -199,9 +199,9 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
     try {
       const sound = soundsRef.current[soundKey];
       if (sound) {
-        await sound.stopAsync().catch(() => {});
-        await sound.setPositionAsync(0).catch(() => {});
-        await sound.playAsync().catch(() => {});
+        await sound.stopAsync().catch(() => { });
+        await sound.setPositionAsync(0).catch(() => { });
+        await sound.playAsync().catch(() => { });
       }
     } catch (err) {
       // Catch silently
@@ -212,7 +212,7 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
     try {
       const sound = soundsRef.current[soundKey];
       if (sound) {
-        await sound.stopAsync().catch(() => {});
+        await sound.stopAsync().catch(() => { });
       }
     } catch (err) {
       // Catch silently
@@ -225,19 +225,19 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
       if (Platform.OS === 'web') return;
       switch (style) {
         case 'light':
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
           break;
         case 'medium':
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
           break;
         case 'heavy':
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => { });
           break;
         case 'success':
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
           break;
         case 'selection':
-          Haptics.selectionAsync().catch(() => {});
+          Haptics.selectionAsync().catch(() => { });
           break;
       }
     } catch (e) {
@@ -531,7 +531,7 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
   // Render SVG or Skia Golden Glow
   const renderGoldenGlow = () => {
     const size = SCREEN_WIDTH * 1.5;
-    
+
     if (isSkiaAvailable) {
       return (
         <Animated.View style={[styles.glowContainer, animatedGlowStyle]}>
@@ -633,7 +633,7 @@ export const DragonRewardReveal: React.FC<DragonRewardRevealProps> = ({
       {/* Main Egg Element */}
       <Animated.View style={[styles.eggWrapper, animatedEggStyle]}>
         <Image source={eggImageSource} style={styles.eggImage} resizeMode="contain" />
-        
+
         {/* Glowing Purple/Vein Overlay */}
         <Animated.View style={[styles.eggOverlay, animatedVeinStyle]}>
           <Image

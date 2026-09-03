@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -101,6 +101,12 @@ export default function RewardsScreen() {
   const [activeTab, setActiveTab] = useState<WalletTab>('ACTIVE');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(85512); // 23:45:12
+
+  const walletScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    walletScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step, activeTab]);
 
   const expandScale = useSharedValue(1);
   const textOpacity = useSharedValue(1);
@@ -427,6 +433,7 @@ export default function RewardsScreen() {
 
             {/* Wallet List */}
             <ScrollView
+              ref={walletScrollRef}
               contentContainerStyle={styles.walletScrollList}
               showsVerticalScrollIndicator={false}
             >

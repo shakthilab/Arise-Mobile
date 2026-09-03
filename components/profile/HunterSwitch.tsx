@@ -2,6 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import { Animated, StyleSheet, TouchableOpacity } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+import { useSettingsStore } from '@/store/useSettingsStore';
+
 export interface HunterSwitchProps {
   value: boolean;
   onValueChange: (val: boolean) => void;
@@ -21,7 +23,9 @@ export function HunterSwitch({ value, onValueChange, disabled }: HunterSwitchPro
 
   const toggle = () => {
     if (disabled) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (useSettingsStore.getState().hapticsEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
     onValueChange(!value);
   };
 

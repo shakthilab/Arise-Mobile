@@ -26,16 +26,18 @@ export function TaskCompletedToast({
 
   useEffect(() => {
     if (visible) {
+      translateY.setValue(-80);
+      opacity.setValue(0);
       Animated.parallel([
         Animated.spring(translateY, {
           toValue: 0,
           friction: 8,
-          tension: 40,
+          tension: 45,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 250,
+          duration: 200,
           useNativeDriver: true,
         }),
       ]).start();
@@ -49,7 +51,7 @@ export function TaskCompletedToast({
       translateY.setValue(-100);
       opacity.setValue(0);
     }
-  }, [visible]);
+  }, [visible, xp, title]);
 
   const handleDismiss = () => {
     Animated.parallel([

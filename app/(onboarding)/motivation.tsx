@@ -71,9 +71,11 @@ export default function MotivationScreen() {
     const headerAnim = useRef(new Animated.Value(0)).current;
     const listAnim = useRef(new Animated.Value(0)).current;
     const buttonAnim = useRef(new Animated.Value(0)).current;
+    const scrollRef = useRef<ScrollView>(null);
 
     useEffect(() => {
-        Animated.stagger(150, [
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+        Animated.stagger(120, [
             Animated.timing(headerAnim, {
                 toValue: 1,
                 duration: 700,
@@ -154,6 +156,7 @@ export default function MotivationScreen() {
 
             {/* ─── Scrollable Content ─── */}
             <ScrollView
+                ref={scrollRef}
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}

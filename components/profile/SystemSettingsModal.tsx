@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   ScrollView,
@@ -14,6 +15,13 @@ import * as Haptics from 'expo-haptics';
 import { GoogleIcon } from '@/components/common/GoogleIcon';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
+import { getCurrentUser, updateUserEmail } from '@/services/api/auth.service';
+import {
+  getUserSettings,
+  updateUserSettings,
+  UserSettings,
+} from '@/services/api/settings.service';
+import { useSettingsContext } from '@/context/SettingsContext';
 import { HunterSwitch } from './HunterSwitch';
 
 export interface SystemSettingsModalProps {
@@ -21,30 +29,30 @@ export interface SystemSettingsModalProps {
   onClose: () => void;
   user: any;
   onUpdateUser: (updatedUser: any) => void;
-  unitSystem: 'metric' | 'imperial';
-  onUnitSystemChange: (system: 'metric' | 'imperial') => void;
-  soundEffectsEnabled: boolean;
-  setSoundEffectsEnabled: (val: boolean) => void;
-  hapticsEnabled: boolean;
-  setHapticsEnabled: (val: boolean) => void;
-  allNotificationsEnabled: boolean;
-  setAllNotificationsEnabled: (val: boolean) => void;
-  dailyMotivationEnabled: boolean;
-  setDailyMotivationEnabled: (val: boolean) => void;
-  taskRemindersEnabled: boolean;
-  setTaskRemindersEnabled: (val: boolean) => void;
-  streakAtRiskEnabled: boolean;
-  setStreakAtRiskEnabled: (val: boolean) => void;
-  streakMilestonesEnabled: boolean;
-  setStreakMilestonesEnabled: (val: boolean) => void;
-  streakStatusAlertsEnabled: boolean;
-  setStreakStatusAlertsEnabled: (val: boolean) => void;
-  levelUpAlertsEnabled: boolean;
-  setLevelUpAlertsEnabled: (val: boolean) => void;
-  rewardReadyAlertsEnabled: boolean;
-  setRewardReadyAlertsEnabled: (val: boolean) => void;
-  announcementsEnabled: boolean;
-  setAnnouncementsEnabled: (val: boolean) => void;
+  unitSystem?: 'metric' | 'imperial';
+  onUnitSystemChange?: (system: 'metric' | 'imperial') => void;
+  soundEffectsEnabled?: boolean;
+  setSoundEffectsEnabled?: (val: boolean) => void;
+  hapticsEnabled?: boolean;
+  setHapticsEnabled?: (val: boolean) => void;
+  allNotificationsEnabled?: boolean;
+  setAllNotificationsEnabled?: (val: boolean) => void;
+  dailyMotivationEnabled?: boolean;
+  setDailyMotivationEnabled?: (val: boolean) => void;
+  taskRemindersEnabled?: boolean;
+  setTaskRemindersEnabled?: (val: boolean) => void;
+  streakAtRiskEnabled?: boolean;
+  setStreakAtRiskEnabled?: (val: boolean) => void;
+  streakMilestonesEnabled?: boolean;
+  setStreakMilestonesEnabled?: (val: boolean) => void;
+  streakStatusAlertsEnabled?: boolean;
+  setStreakStatusAlertsEnabled?: (val: boolean) => void;
+  levelUpAlertsEnabled?: boolean;
+  setLevelUpAlertsEnabled?: (val: boolean) => void;
+  rewardReadyAlertsEnabled?: boolean;
+  setRewardReadyAlertsEnabled?: (val: boolean) => void;
+  announcementsEnabled?: boolean;
+  setAnnouncementsEnabled?: (val: boolean) => void;
 }
 
 export function SystemSettingsModal({
@@ -52,32 +60,34 @@ export function SystemSettingsModal({
   onClose,
   user,
   onUpdateUser,
-  unitSystem,
+  unitSystem = 'metric',
   onUnitSystemChange,
-  soundEffectsEnabled,
-  setSoundEffectsEnabled,
-  hapticsEnabled,
-  setHapticsEnabled,
-  allNotificationsEnabled,
-  setAllNotificationsEnabled,
-  dailyMotivationEnabled,
-  setDailyMotivationEnabled,
-  taskRemindersEnabled,
-  setTaskRemindersEnabled,
-  streakAtRiskEnabled,
-  setStreakAtRiskEnabled,
-  streakMilestonesEnabled,
-  setStreakMilestonesEnabled,
-  streakStatusAlertsEnabled,
-  setStreakStatusAlertsEnabled,
-  levelUpAlertsEnabled,
-  setLevelUpAlertsEnabled,
-  rewardReadyAlertsEnabled,
-  setRewardReadyAlertsEnabled,
-  announcementsEnabled,
-  setAnnouncementsEnabled,
 }: SystemSettingsModalProps) {
-  const [themeMode, setThemeMode] = useState<'dark' | 'light' | 'system'>('dark');
+  // Local Device Settings from SettingsContext (AsyncStorage layer)
+  const {
+    themeMode,
+    setThemeMode,
+    soundEffectsEnabled,
+    setSoundEffectsEnabled,
+    hapticsEnabled,
+    setHapticsEnabled,
+  } = useSettingsContext();
+
+  // Account-Level Preferences state (backend layer)
+  const [accountSettings, setAccountSettings] = useState<UserSettings>({
+    units: unitSystem || 'metric',
+    notify_all: true,
+    notify_daily_motivation: true,
+    notify_task_reminders: true,
+    notify_streak_preservation: true,
+    notify_streak_milestones: true,
+    notify_streak_freeze: true,
+    notify_level_up: true,
+    notify_reward_ready: true,
+    notify_announcements: true,
+  });
+
+  const [isFetchingAccountSettings, setIsFetchingAccountSettings] = useState(false);
 
   // Submodals
   const [isChangePasswordModalVisible, setIsChangePasswordModalVisible] = useState(false);
@@ -86,6 +96,59 @@ export function SystemSettingsModal({
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [newEmailInput, setNewEmailInput] = useState('');
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+
+  // Fetch account-level settings on modal mount
+  useEffect(() => {
+    let isMounted = true;
+    if (visible) {
+      setIsFetchingAccountSettings(true);
+      getUserSettings()
+        .then((data) => {
+          if (isMounted && data) {
+            setAccountSettings(data);
+            if (data.units && onUnitSystemChange) {
+              onUnitSystemChange(data.units);
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn('[SystemSettingsModal] Error fetching account settings:', err);
+        })
+        .finally(() => {
+          if (isMounted) setIsFetchingAccountSettings(false);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [visible]);
+
+  // Optimistic handler for account settings toggle
+  const handleToggleAccountSetting = async <K extends keyof UserSettings>(
+    field: K,
+    newValue: UserSettings[K]
+  ) => {
+    const previousValue = accountSettings[field];
+    // Optimistic UI update
+    setAccountSettings((prev) => ({ ...prev, [field]: newValue }));
+
+    if (field === 'units' && onUnitSystemChange) {
+      onUnitSystemChange(newValue as 'metric' | 'imperial');
+    }
+
+    try {
+      await updateUserSettings({ [field]: newValue });
+    } catch (err: any) {
+      // Revert state on failure
+      setAccountSettings((prev) => ({ ...prev, [field]: previousValue }));
+      if (field === 'units' && onUnitSystemChange) {
+        onUnitSystemChange(previousValue as 'metric' | 'imperial');
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Alert.alert('Setting Update Failed', err.message || 'Failed to sync preference.');
+    }
+  };
 
   const handleChangePassword = () => {
     if (!currentPasswordInput || !newPasswordInput || !confirmPasswordInput) {
@@ -108,34 +171,69 @@ export function SystemSettingsModal({
     setConfirmPasswordInput('');
   };
 
-  const handleChangeEmail = () => {
+  const providerStr =
+    user?.provider ?? user?.authProvider ?? user?.auth_provider ?? 'EMAIL';
+  const p = String(providerStr).toUpperCase();
+  const isSocialAuth = p === 'GOOGLE' || p === 'APPLE';
+
+  const handlePressChangeEmail = () => {
+    if (!isSocialAuth) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      Alert.alert(
+        'Action Restricted',
+        'Accounts registered via Email & Password cannot update their primary email address.'
+      );
+      return;
+    }
+    setNewEmailInput(user?.email || '');
+    setIsChangeEmailModalVisible(true);
+  };
+
+  const handleChangeEmail = async () => {
     const trimmed = newEmailInput.trim();
     if (!trimmed || !trimmed.includes('@')) {
       Alert.alert('Error', 'Please enter a valid email address.');
       return;
     }
-    if (user) {
-      onUpdateUser({ ...user, email: trimmed });
+
+    if (trimmed.toLowerCase() === (user?.email || '').toLowerCase()) {
+      setIsChangeEmailModalVisible(false);
+      return;
     }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    Alert.alert('Success', `Your email address has been updated to ${trimmed}.`);
-    setIsChangeEmailModalVisible(false);
-    setNewEmailInput('');
+
+    try {
+      setIsUpdatingEmail(true);
+      const updatedUser = await updateUserEmail(trimmed);
+      onUpdateUser(updatedUser);
+
+      try {
+        const freshUser = await getCurrentUser();
+        if (freshUser) onUpdateUser(freshUser);
+      } catch {}
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert('Success', 'Your email address has been updated to ' + trimmed + '.');
+      setIsChangeEmailModalVisible(false);
+      setNewEmailInput('');
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Alert.alert('Update Failed', err.message || 'Failed to update email address.');
+    } finally {
+      setIsUpdatingEmail(false);
+    }
   };
 
   const handleDownloadData = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     Alert.alert(
       'Data Export Requested',
-      `We are preparing an archive of your HunterX workouts, quests, and account history. A download link will be emailed to ${
-        user?.email || 'your registered email'
-      } within 24 hours.`
+      'We are preparing an archive of your HunterX workouts, quests, and account history. A download link will be emailed to ' +
+        (user?.email || 'your registered email') +
+        ' within 24 hours.'
     );
   };
 
-  const providerStr =
-    user?.provider ?? user?.authProvider ?? user?.auth_provider ?? 'EMAIL';
-  const p = String(providerStr).toUpperCase();
+  const allOn = accountSettings.notify_all;
 
   return (
     <Modal
@@ -166,19 +264,27 @@ export function SystemSettingsModal({
           <Text style={styles.sectionHeader}>APPEARANCE & THEME</Text>
           <View style={styles.settingsGroupCard}>
             <View style={styles.themeSelectorRow}>
-              {/* Dark Mode - Active & Selected */}
+              {/* Dark Mode */}
               <TouchableOpacity
-                style={[styles.themeModeCard, styles.themeModeCardSelected]}
+                style={[
+                  styles.themeModeCard,
+                  themeMode === 'dark' && styles.themeModeCardSelected,
+                ]}
                 onPress={() => setThemeMode('dark')}
                 activeOpacity={0.8}
               >
                 <Ionicons name="moon" size={20} color="#FE5B01" />
-                <Text style={[styles.themeModeText, styles.themeModeTextSelected]}>
+                <Text
+                  style={[
+                    styles.themeModeText,
+                    themeMode === 'dark' && styles.themeModeTextSelected,
+                  ]}
+                >
                   Dark Mode
                 </Text>
               </TouchableOpacity>
 
-              {/* Light Mode - Disabled / Coming Soon */}
+              {/* Light Mode */}
               <View style={[styles.themeModeCard, styles.themeModeCardDisabled]}>
                 <View style={styles.comingSoonPill}>
                   <Text style={styles.comingSoonPillText}>SOON</Text>
@@ -189,7 +295,7 @@ export function SystemSettingsModal({
                 </Text>
               </View>
 
-              {/* System - Disabled / Coming Soon */}
+              {/* System */}
               <View style={[styles.themeModeCard, styles.themeModeCardDisabled]}>
                 <View style={styles.comingSoonPill}>
                   <Text style={styles.comingSoonPillText}>SOON</Text>
@@ -261,15 +367,11 @@ export function SystemSettingsModal({
               </>
             )}
 
+            {/* Change Email (Commented Out)
             <View style={styles.settingItemDivider} />
-
-            {/* Change Email */}
             <TouchableOpacity
-              style={styles.settingRow}
-              onPress={() => {
-                setNewEmailInput(user?.email || '');
-                setIsChangeEmailModalVisible(true);
-              }}
+              style={[styles.settingRow, !isSocialAuth && { opacity: 0.6 }]}
+              onPress={handlePressChangeEmail}
               activeOpacity={0.7}
             >
               <View style={styles.settingLeftGroup}>
@@ -278,14 +380,23 @@ export function SystemSettingsModal({
                 </View>
                 <View style={styles.settingTextGroup}>
                   <Text style={styles.settingTitle}>Change Email</Text>
-                  <Text style={styles.settingSubtitle}>Update primary email address</Text>
+                  <Text style={styles.settingSubtitle}>
+                    {isSocialAuth
+                      ? 'Update primary email address'
+                      : 'Restricted for Email & Password accounts'}
+                  </Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#71717A" />
+              {isSocialAuth ? (
+                <Ionicons name="chevron-forward" size={16} color="#71717A" />
+              ) : (
+                <Ionicons name="lock-closed-outline" size={16} color="#71717A" />
+              )}
             </TouchableOpacity>
+            */}
           </View>
 
-          {/* SECTION 3: PREFERENCES */}
+          {/* SECTION 3: PREFERENCES (ACCOUNT-LEVEL BACKEND SYNC) */}
           <Text style={styles.sectionHeader}>PREFERENCES</Text>
           <View style={styles.settingsGroupCard}>
             <View style={styles.settingRow}>
@@ -302,15 +413,15 @@ export function SystemSettingsModal({
                 <TouchableOpacity
                   style={[
                     styles.unitSegmentBtn,
-                    unitSystem === 'metric' && styles.unitSegmentBtnActive,
+                    accountSettings.units === 'metric' && styles.unitSegmentBtnActive,
                   ]}
-                  onPress={() => onUnitSystemChange('metric')}
+                  onPress={() => handleToggleAccountSetting('units', 'metric')}
                   activeOpacity={0.7}
                 >
                   <Text
                     style={[
                       styles.unitSegmentText,
-                      unitSystem === 'metric' && styles.unitSegmentTextActive,
+                      accountSettings.units === 'metric' && styles.unitSegmentTextActive,
                     ]}
                   >
                     Metric (cm, kg)
@@ -319,15 +430,15 @@ export function SystemSettingsModal({
                 <TouchableOpacity
                   style={[
                     styles.unitSegmentBtn,
-                    unitSystem === 'imperial' && styles.unitSegmentBtnActive,
+                    accountSettings.units === 'imperial' && styles.unitSegmentBtnActive,
                   ]}
-                  onPress={() => onUnitSystemChange('imperial')}
+                  onPress={() => handleToggleAccountSetting('units', 'imperial')}
                   activeOpacity={0.7}
                 >
                   <Text
                     style={[
                       styles.unitSegmentText,
-                      unitSystem === 'imperial' && styles.unitSegmentTextActive,
+                      accountSettings.units === 'imperial' && styles.unitSegmentTextActive,
                     ]}
                   >
                     Imperial (ft, lbs)
@@ -337,7 +448,7 @@ export function SystemSettingsModal({
             </View>
           </View>
 
-          {/* SECTION 4: AUDIO & HAPTICS */}
+          {/* SECTION 4: AUDIO & HAPTICS (LOCAL ASYNCSTORAGE LAYER) */}
           <Text style={styles.sectionHeader}>AUDIO & HAPTICS</Text>
           <View style={styles.settingsGroupCard}>
             {/* Sound Effects */}
@@ -379,7 +490,7 @@ export function SystemSettingsModal({
             </View>
           </View>
 
-          {/* SECTION 5: HUNTER NOTIFICATIONS */}
+          {/* SECTION 5: HUNTER NOTIFICATIONS (ACCOUNT-LEVEL BACKEND SYNC) */}
           <Text style={styles.sectionHeader}>HUNTER NOTIFICATIONS</Text>
           <View style={styles.settingsGroupCard}>
             {/* Master All Notifications Toggle */}
@@ -387,9 +498,9 @@ export function SystemSettingsModal({
               <View style={styles.settingLeftGroup}>
                 <View style={styles.settingIconBox}>
                   <Ionicons
-                    name={allNotificationsEnabled ? 'notifications' : 'notifications-off-outline'}
+                    name={allOn ? 'notifications' : 'notifications-off-outline'}
                     size={18}
-                    color={allNotificationsEnabled ? '#FE5B01' : '#71717A'}
+                    color={allOn ? '#FE5B01' : '#71717A'}
                   />
                 </View>
                 <View style={styles.settingTextGroup}>
@@ -400,13 +511,13 @@ export function SystemSettingsModal({
                 </View>
               </View>
               <HunterSwitch
-                value={allNotificationsEnabled}
-                onValueChange={setAllNotificationsEnabled}
+                value={allOn}
+                onValueChange={(val) => handleToggleAccountSetting('notify_all', val)}
               />
             </View>
 
             {/* Sub-Notification Toggles */}
-            <View style={{ opacity: allNotificationsEnabled ? 1 : 0.4 }}>
+            <View style={{ opacity: allOn ? 1 : 0.4 }}>
               <View style={styles.settingItemDivider} />
 
               {/* 1. Daily Motivation */}
@@ -423,9 +534,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && dailyMotivationEnabled}
-                  onValueChange={setDailyMotivationEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_daily_motivation}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_daily_motivation', val)}
                 />
               </View>
 
@@ -445,9 +556,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && taskRemindersEnabled}
-                  onValueChange={setTaskRemindersEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_task_reminders}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_task_reminders', val)}
                 />
               </View>
 
@@ -467,9 +578,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && streakAtRiskEnabled}
-                  onValueChange={setStreakAtRiskEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_streak_preservation}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_streak_preservation', val)}
                 />
               </View>
 
@@ -489,9 +600,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && streakMilestonesEnabled}
-                  onValueChange={setStreakMilestonesEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_streak_milestones}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_streak_milestones', val)}
                 />
               </View>
 
@@ -511,9 +622,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && streakStatusAlertsEnabled}
-                  onValueChange={setStreakStatusAlertsEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_streak_freeze}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_streak_freeze', val)}
                 />
               </View>
 
@@ -533,9 +644,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && levelUpAlertsEnabled}
-                  onValueChange={setLevelUpAlertsEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_level_up}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_level_up', val)}
                 />
               </View>
 
@@ -555,9 +666,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && rewardReadyAlertsEnabled}
-                  onValueChange={setRewardReadyAlertsEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_reward_ready}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_reward_ready', val)}
                 />
               </View>
 
@@ -577,9 +688,9 @@ export function SystemSettingsModal({
                   </View>
                 </View>
                 <HunterSwitch
-                  disabled={!allNotificationsEnabled}
-                  value={allNotificationsEnabled && announcementsEnabled}
-                  onValueChange={setAnnouncementsEnabled}
+                  disabled={!allOn}
+                  value={allOn && accountSettings.notify_announcements}
+                  onValueChange={(val) => handleToggleAccountSetting('notify_announcements', val)}
                 />
               </View>
             </View>
@@ -694,8 +805,13 @@ export function SystemSettingsModal({
                 <TouchableOpacity
                   style={[styles.modalBtn, styles.saveBtn]}
                   onPress={handleChangeEmail}
+                  disabled={isUpdatingEmail}
                 >
-                  <Text style={styles.saveBtnText}>Save</Text>
+                  {isUpdatingEmail ? (
+                    <ActivityIndicator size="small" color="#FE5B01" />
+                  ) : (
+                    <Text style={styles.saveBtnText}>Save</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -802,218 +918,191 @@ const styles = StyleSheet.create({
   themeSelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   themeModeCard: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    backgroundColor: '#18181D',
     borderRadius: 14,
-    backgroundColor: '#18181C',
-    borderWidth: 1.5,
-    borderColor: '#2A2A30',
+    borderWidth: 1,
+    borderColor: '#2D2D34',
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-  },
-  themeModeCardSelected: {
-    backgroundColor: 'rgba(254, 91, 1, 0.12)',
-    borderColor: '#FE5B01',
-  },
-  themeModeCardDisabled: {
-    backgroundColor: '#141417',
-    borderColor: '#202026',
-    opacity: 0.55,
+    gap: 8,
     position: 'relative',
   },
+  themeModeCardSelected: {
+    borderColor: '#FE5B01',
+    backgroundColor: 'rgba(254, 91, 1, 0.1)',
+  },
+  themeModeCardDisabled: {
+    opacity: 0.5,
+  },
   themeModeText: {
-    fontFamily: fontFamilies.medium,
-    fontSize: 12,
-    color: '#A1A1AA',
+    fontFamily: fontFamilies.bold,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#71717A',
   },
   themeModeTextSelected: {
-    fontFamily: fontFamilies.bold,
-    color: '#FE5B01',
-    fontWeight: '800',
+    color: '#FFFFFF',
   },
   themeModeTextDisabled: {
-    fontFamily: fontFamilies.medium,
-    fontSize: 12,
     color: '#52525B',
   },
   comingSoonPill: {
     position: 'absolute',
-    top: 5,
-    right: 5,
+    top: 6,
+    right: 6,
     backgroundColor: '#27272A',
-    paddingHorizontal: 4,
-    paddingVertical: 1.5,
     borderRadius: 4,
-    borderWidth: 0.5,
-    borderColor: '#3F3F46',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
   comingSoonPillText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 7.5,
+    fontSize: 8,
     color: '#A1A1AA',
-    fontWeight: '800',
-    letterSpacing: 0.4,
   },
   googleProviderPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 5.5,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#FE5B01',
-    backgroundColor: '#141416',
+    gap: 6,
+    backgroundColor: '#1C1C22',
+    borderWidth: 1,
+    borderColor: '#2D2D35',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   googleProviderPillText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FE5B01',
+    fontSize: 12,
+    color: '#FFFFFF',
   },
   appleProviderPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 5.5,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#18181B',
+    gap: 6,
+    backgroundColor: '#1C1C22',
+    borderWidth: 1,
+    borderColor: '#2D2D35',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   appleProviderPillText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 12,
     color: '#FFFFFF',
   },
   emailProviderPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 5.5,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: '#FE5B01',
-    backgroundColor: '#141416',
+    gap: 6,
+    backgroundColor: 'rgba(254, 91, 1, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(254, 91, 1, 0.3)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   emailProviderPillText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 12,
     color: '#FE5B01',
   },
   unitsSegmentedContainer: {
     flexDirection: 'row',
-    backgroundColor: '#18181C',
+    backgroundColor: '#18181D',
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#27272A',
     padding: 3,
-    gap: 3,
   },
   unitSegmentBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 7,
+    borderRadius: 8,
   },
   unitSegmentBtnActive: {
     backgroundColor: '#FE5B01',
   },
   unitSegmentText: {
-    fontFamily: fontFamilies.medium,
+    fontFamily: fontFamilies.bold,
     fontSize: 11,
-    color: '#A1A1AA',
+    color: '#71717A',
   },
   unitSegmentTextActive: {
-    fontFamily: fontFamilies.bold,
     color: '#FFFFFF',
-    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     alignItems: 'center',
-    padding: 24,
+    justifyContent: 'center',
+    padding: 20,
   },
   modalCard: {
-    backgroundColor: '#18181C',
+    width: '100%',
+    backgroundColor: '#141418',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2E2E36',
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-    alignItems: 'center',
+    borderColor: '#27272A',
+    padding: 20,
+    gap: 14,
   },
   modalTitle: {
     fontFamily: fontFamilies.bold,
     fontSize: 18,
-    fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 4,
-    textAlign: 'center',
   },
   modalSubtitleText: {
     fontFamily: fontFamilies.regular,
     fontSize: 13,
-    color: '#71717A',
-    marginBottom: 16,
-    textAlign: 'center',
+    color: '#A1A1AA',
   },
   modalInput: {
-    width: '100%',
-    backgroundColor: '#121215',
+    backgroundColor: '#1E1E24',
     borderWidth: 1,
     borderColor: '#3F3F46',
-    borderRadius: 14,
-    paddingHorizontal: 16,
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 12,
+    color: '#FFFFFF',
     fontFamily: fontFamilies.regular,
     fontSize: 14,
-    color: '#FFFFFF',
-    marginBottom: 12,
   },
   modalActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 12,
-    width: '100%',
-    marginTop: 8,
+    gap: 10,
+    marginTop: 6,
   },
   modalBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 90,
   },
   cancelBtn: {
     backgroundColor: '#27272A',
   },
   cancelBtnText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
     color: '#A1A1AA',
   },
   saveBtn: {
     backgroundColor: '#FE5B01',
+    minWidth: 70,
   },
   saveBtnText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
     color: '#FFFFFF',
   },
 });

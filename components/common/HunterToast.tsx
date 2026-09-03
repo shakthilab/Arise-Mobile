@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { triggerHaptic } from '@/services/audio/hapticsService';
 import { fontFamilies } from '@/theme/typography';
 
 export type HunterToastType = 'error' | 'warning' | 'info' | 'success';
@@ -29,11 +30,11 @@ export function HunterToast({
       if (timerRef.current) clearTimeout(timerRef.current);
 
       if (type === 'error') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        triggerHaptic.notification(Haptics.NotificationFeedbackType.Error);
       } else if (type === 'success') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        triggerHaptic.notification(Haptics.NotificationFeedbackType.Success);
       } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        triggerHaptic.impact(Haptics.ImpactFeedbackStyle.Light);
       }
 
       Animated.spring(anim, {

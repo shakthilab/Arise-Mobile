@@ -50,6 +50,12 @@ export default function FeedbackScreen() {
   const { user } = useAuth();
   const userAny = user as any;
 
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
+
   // Form States
   const [selectedCategory, setSelectedCategory] = useState<FeedbackCategory | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
@@ -255,6 +261,7 @@ export default function FeedbackScreen() {
           </View>
         ) : (
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"

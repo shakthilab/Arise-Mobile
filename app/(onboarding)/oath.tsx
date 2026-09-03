@@ -41,8 +41,10 @@ export default function OathScreen() {
     // Animations
     const contentAnim = useRef(new Animated.Value(0)).current;
     const buttonAnim = useRef(new Animated.Value(0)).current;
+    const scrollRef = useRef<ScrollView>(null);
 
     useEffect(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
         Animated.stagger(200, [
             Animated.timing(contentAnim, {
                 toValue: 1,
@@ -118,6 +120,7 @@ export default function OathScreen() {
 
             {/* ─── Scrollable Content ─── */}
             <ScrollView
+                ref={scrollRef}
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}

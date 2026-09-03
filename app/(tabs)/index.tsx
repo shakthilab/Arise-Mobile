@@ -13,7 +13,8 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useScrollToTop } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -30,6 +31,7 @@ import { QuestActionModal } from '@/components/features/missions/QuestActionModa
 import { TaskCompletedToast } from '@/components/features/missions/TaskCompletedToast';
 import { WeeklyTracker } from '@/components/features/streaks/WeeklyTracker';
 import * as Haptics from 'expo-haptics';
+import { playTaskDoneSound } from '@/services/audio/taskDoneSound';
 import { useAuth } from '@/hooks/useAuth';
 import { useLootDrop } from '@/hooks/useLootDrop';
 import { fontFamilies } from '@/theme/typography';
@@ -259,6 +261,15 @@ export default function MissionsHomeScreen() {
   const params = useLocalSearchParams<{ fromAscension?: string }>();
   const isFromAscension = params.fromAscension === 'true';
 
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, [])
+  );
+
   const [dropVisible, setDropVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'todo' | 'done' | 'skipped'>('todo');
 
@@ -287,6 +298,8 @@ export default function MissionsHomeScreen() {
   const [selectedQuest, setSelectedQuest] = useState<QuestItem | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [completedToastVisible, setCompletedToastVisible] = useState(false);
+  const [completedToastTitle, setCompletedToastTitle] = useState('Task Completed!');
+  const [completedToastSubtitle, setCompletedToastSubtitle] = useState('Great job, hunter!');
   const [dayCompleteModalVisible, setDayCompleteModalVisible] = useState(false);
   const [toastXp, setToastXp] = useState(10);
   const [errorToastVisible, setErrorToastVisible] = useState(false);
@@ -421,13 +434,14 @@ export default function MissionsHomeScreen() {
     );
 
     if (actionStatus === 'COMPLETED' || actionStatus === 'PARTIAL') {
+      const isPartial = actionStatus === 'PARTIAL';
+      setCompletedToastTitle(isPartial ? 'Partial Progress!' : 'Task Completed!');
+      setCompletedToastSubtitle(
+        isPartial ? 'Progress logged · Half XP earned!' : 'Great job, hunter!'
+      );
       setToastXp(optimisticEarnedXp);
       setCompletedToastVisible(true);
-      if (actionStatus === 'COMPLETED') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      }
+      playTaskDoneSound(isPartial ? 'partial' : 'completed');
     } else {
       setCompletedToastVisible(false);
     }
@@ -530,6 +544,7 @@ export default function MissionsHomeScreen() {
   return (
     <Screen style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -981,6 +996,8 @@ export default function MissionsHomeScreen() {
       <TaskCompletedToast
         visible={completedToastVisible}
         xp={toastXp}
+        title={completedToastTitle}
+        subtitle={completedToastSubtitle}
         onDismiss={() => setCompletedToastVisible(false)}
       />
 

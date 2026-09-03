@@ -87,6 +87,7 @@ export default function PhysicalProfileScreen() {
   const [weightError, setWeightError] = useState('');
 
   const rulerScrollRef = useRef<ScrollView>(null);
+  const mainScrollRef = useRef<ScrollView>(null);
   const startWeightRef = useRef(targetWeight);
 
   const triggerHaptic = () => {
@@ -136,6 +137,8 @@ export default function PhysicalProfileScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    mainScrollRef.current?.scrollTo({ y: 0, animated: false });
 
     // Scroll Height ruler to initial value on mount
     setTimeout(() => {
@@ -315,6 +318,7 @@ export default function PhysicalProfileScreen() {
 
       {/* ─── Scrollable Content ─── */}
       <ScrollView
+        ref={mainScrollRef}
         scrollEnabled={scrollEnabled}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"

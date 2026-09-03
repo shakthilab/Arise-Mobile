@@ -1,12 +1,16 @@
 import { Image as ExpoImage } from 'expo-image';
 import { Image as RNImage } from 'react-native';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import { preloadTaskDoneSound } from '@/services/audio/taskDoneSound';
 
 /**
  * Preloads and warms the memory and disk caches for all remote Cloudinary assets
- * so they render instantly with zero delay, blank screen, or flickering.
+ * and local sound assets so they render/play instantly with zero delay.
  */
 export async function preloadAppAssets(): Promise<void> {
+  // Pre-warm done.wav audio buffer for ultra-snappy feedback
+  preloadTaskDoneSound().catch(() => {});
+
   const imageUrls = Object.values(CLOUDINARY_ASSETS)
     .map((asset) => asset.uri)
     .filter((uri) => !uri.includes('/video/upload/') && !uri.endsWith('.mp3'));

@@ -1,4 +1,5 @@
-import { StyleSheet, View, type ViewProps } from 'react-native';
+import { useEffect } from 'react';
+import { Platform, StyleSheet, View, type ViewProps } from 'react-native';
 import { useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme';
@@ -21,6 +22,16 @@ export function Screen({ children, style, edges = DEFAULT_EDGES, ...rest }: Scre
   // bar. Context-based insets are plain numbers threaded through React, so
   // they stay correct everywhere: tab screens, stack screens, and Modals.
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        if (document.documentElement) document.documentElement.scrollTop = 0;
+        if (document.body) document.body.scrollTop = 0;
+      } catch (_) {}
+    }
+  }, []);
 
   return (
     <View

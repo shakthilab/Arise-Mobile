@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { fontFamilies } from '@/theme/typography';
 import { getAvatarSource } from '@/app/(tabs)/profile';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 import type { WeekStatus } from '@/types/user';
+import { WeeklyProgressCard } from './WeeklyProgressCard';
 
 export type DayStatus = 'completed' | 'today' | 'missed' | 'locked' | 'freeze';
 
@@ -29,6 +30,7 @@ interface WeeklyTrackerProps {
   subtitleMessage?: string;
   characterImageSource?: any;
   avatarUrl?: string | null;
+  showBottomCard?: boolean;
   onDayPress?: (day: DayTrackerItem) => void;
 }
 
@@ -166,6 +168,57 @@ export function generateCurrentWeekDays(completedCount?: number): DayTrackerItem
   });
 }
 
+function TodayStarIcon({ size = 18 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="-12 -12 24 24" fill="none">
+      {/* 4-point Shuriken Star with Center Hole */}
+      <Path
+        fill="#FFFFFF"
+        fillRule="evenodd"
+        d="
+          M 0,-9.6
+          C 0.9,-4.2 4.2,-0.9 9.6,0
+          C 4.2,0.9 0.9,4.2 0,9.6
+          C -0.9,4.2 -4.2,0.9 -9.6,0
+          C -4.2,-0.9 -0.9,-4.2 0,-9.6 Z
+          M 0,-1.3
+          A 1.3 1.3 0 1 0 0,1.3
+          A 1.3 1.3 0 1 0 0,-1.3 Z
+        "
+      />
+      {/* 4 Corner Arc Accents */}
+      <Path
+        d="M 3.1,-4.9 A 5.8 5.8 0 0 1 4.9,-3.1"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={1.1}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M 4.9,3.1 A 5.8 5.8 0 0 1 3.1,4.9"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={1.1}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M -3.1,4.9 A 5.8 5.8 0 0 1 -4.9,3.1"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={1.1}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M -4.9,-3.1 A 5.8 5.8 0 0 1 -3.1,-4.9"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={1.1}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 const DEFAULT_CHARACTER_IMAGE = CLOUDINARY_ASSETS.high_fidelity;
 
 export function WeeklyTracker({
@@ -177,6 +230,7 @@ export function WeeklyTracker({
   subtitleMessage = 'Track your progress. Consistency builds legends.',
   characterImageSource = DEFAULT_CHARACTER_IMAGE,
   avatarUrl,
+  showBottomCard = false,
   onDayPress,
 }: WeeklyTrackerProps) {
   const activeDays = useMemo(() => {
@@ -278,16 +332,12 @@ export function WeeklyTracker({
                 >
                   <Text style={styles.todayDayName}>{item.dayName}</Text>
 
-                  {/* Circle Node inside TODAY card */}
-                  {item.isDone ? (
-                    <View style={styles.todayCircleNodeCompleted}>
-                      <Ionicons name="checkmark" size={16} color="#FE5B01" />
+                  {/* Glowing Circle Node inside TODAY card */}
+                  <View style={styles.todayCircleNode}>
+                    <View style={styles.todayCircleInnerRim}>
+                      <TodayStarIcon size={17} />
                     </View>
-                  ) : (
-                    <View style={styles.todayCircleNodePending}>
-                      <View style={styles.todayPendingDot} />
-                    </View>
-                  )}
+                  </View>
 
                   <Text style={styles.todayDateNum}>{item.dateNum}</Text>
 
@@ -366,19 +416,28 @@ export function WeeklyTracker({
         </View>
       </View>
 
-      {/* BOTTOM CARD SECTION */}
+      {showBottomCard && (
+        <WeeklyProgressCard
+          days={days}
+          weekStatus={weekStatus}
+          completedDaysCount={completedDaysCount}
+          totalDaysCount={totalDaysCount}
+          characterImageSource={characterImageSource}
+          avatarUrl={avatarUrl}
+        />
+      )}
+
+      {/* 
+      BOTTOM CARD SECTION (Preserved as commented-out code)
       <View style={styles.bottomCard}>
-        {/* Full-Height Right Overlay Character Image */}
         <View style={styles.characterImageWrapper} pointerEvents="none">
           <Image source={imageSource} style={styles.characterImage} resizeMode="cover" />
-          {/* Left-to-right gradient fade for seamless background integration */}
           <LinearGradient
             colors={['#141418', 'rgba(20, 20, 24, 0.75)', 'rgba(20, 20, 24, 0.2)', 'transparent']}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 0.75, y: 0.5 }}
             style={StyleSheet.absoluteFillObject}
           />
-          {/* Top and bottom edge soft fade */}
           <LinearGradient
             colors={['rgba(20, 20, 24, 0.6)', 'transparent', 'transparent', 'rgba(20, 20, 24, 0.7)']}
             locations={[0, 0.2, 0.8, 1]}
@@ -389,7 +448,6 @@ export function WeeklyTracker({
         </View>
 
         <View style={styles.bottomCardContent}>
-          {/* Circular Progress & Completed Days */}
           <View style={styles.progressRingSection}>
             <View style={styles.ringWrapper}>
               <Svg width={48} height={48} viewBox="0 0 50 50">
@@ -428,10 +486,21 @@ export function WeeklyTracker({
 
           <View style={styles.verticalDivider} />
 
-          {/* Middle Encouragement Text */}
           <View style={styles.encouragementSection}>
-            <Text style={styles.encouragementTitle}>Keep it up, hunter!</Text>
-            <Text style={styles.encouragementSubtext}>
+            <Text
+              style={styles.encouragementTitle}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
+              Keep it up, hunter!
+            </Text>
+            <Text
+              style={styles.encouragementSubtext}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               <Text style={styles.orangeHighlightNumber}>
                 {Math.max(0, totalDaysCount - completedCount)}
               </Text>
@@ -440,7 +509,6 @@ export function WeeklyTracker({
           </View>
         </View>
 
-        {/* BOTTOM SEGMENTED PROGRESS BAR */}
         <View style={styles.segmentedBarRow}>
           {activeDays.map((dayItem, index) => {
             let segColor = '#26262E';
@@ -463,6 +531,7 @@ export function WeeklyTracker({
           })}
         </View>
       </View>
+      */}
     </View>
   );
 }
@@ -473,7 +542,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#202026',
-    padding: 16,
+    padding: 12,
     marginHorizontal: 0,
     marginVertical: 12,
     width: '100%',
@@ -550,12 +619,11 @@ const styles = StyleSheet.create({
   /* DAYS ROW & MOVING TIMELINE PATH */
   daysRowContainer: {
     position: 'relative',
-    marginBottom: 18,
-    justifyContent: 'center',
+    marginBottom: 24,
   },
   timelineLineBackground: {
     position: 'absolute',
-    top: 38,
+    top: 37.5,
     height: 3,
     zIndex: 0,
   },
@@ -594,7 +662,7 @@ const styles = StyleSheet.create({
 
   daysRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     zIndex: 1,
   },
@@ -607,8 +675,12 @@ const styles = StyleSheet.create({
   completedDayName: {
     fontFamily: fontFamilies.medium,
     fontSize: 11,
+    lineHeight: 14,
+    height: 14,
     color: '#FFFFFF',
     marginBottom: 8,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   completedCircle: {
     width: 34,
@@ -629,15 +701,23 @@ const styles = StyleSheet.create({
   completedDateNum: {
     fontFamily: fontFamilies.medium,
     fontSize: 12,
+    lineHeight: 16,
+    height: 16,
     color: '#FFFFFF',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
 
   /* MISSED / LEFT DAY (Hollow Dashed Outline) */
   missedDayName: {
     fontFamily: fontFamilies.medium,
     fontSize: 11,
+    lineHeight: 14,
+    height: 14,
     color: '#71717A',
     marginBottom: 8,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   missedCircle: {
     width: 34,
@@ -654,15 +734,23 @@ const styles = StyleSheet.create({
   missedDateNum: {
     fontFamily: fontFamilies.medium,
     fontSize: 12,
+    lineHeight: 16,
+    height: 16,
     color: '#71717A',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
 
   /* FROZEN / REST DAY */
   freezeDayName: {
     fontFamily: fontFamilies.medium,
     fontSize: 11,
+    lineHeight: 14,
+    height: 14,
     color: '#38BDF8',
     marginBottom: 8,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   freezeCircle: {
     width: 34,
@@ -683,15 +771,23 @@ const styles = StyleSheet.create({
   freezeDateNum: {
     fontFamily: fontFamilies.medium,
     fontSize: 12,
+    lineHeight: 16,
+    height: 16,
     color: '#BAE6FD',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
 
   /* LOCKED / UPCOMING DAY */
   lockedDayName: {
     fontFamily: fontFamilies.medium,
     fontSize: 11,
+    lineHeight: 14,
+    height: 14,
     color: '#71717A',
     marginBottom: 8,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   lockedCircle: {
     width: 34,
@@ -707,99 +803,94 @@ const styles = StyleSheet.create({
   lockedDateNum: {
     fontFamily: fontFamilies.medium,
     fontSize: 12,
+    lineHeight: 16,
+    height: 16,
     color: '#71717A',
+    textAlign: 'center',
+    includeFontPadding: false,
   },
 
   /* TODAY HIGHLIGHT CARD */
   todayCardContainer: {
     alignItems: 'center',
     flex: 1,
-    alignSelf: 'stretch',
-    marginVertical: -10,
-    paddingTop: 6,
+    marginTop: -10,
+    paddingTop: 8,
     paddingBottom: 0,
     paddingHorizontal: 0,
-    backgroundColor: '#1E1915',
-    borderWidth: 1.5,
-    borderColor: '#FE5B01',
-    borderRadius: 14,
+    backgroundColor: '#151517',
+    borderWidth: 1,
+    borderColor: '#24242A',
+    borderRadius: 16,
     overflow: 'hidden',
-    justifyContent: 'space-between',
-    shadowColor: '#FE5B01',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
     zIndex: 2,
   },
   todayDayName: {
     fontFamily: fontFamilies.bold,
-    fontSize: 11,
-    color: '#FFFFFF',
-    marginTop: 2,
-    marginBottom: 4,
+    fontSize: 12,
+    lineHeight: 15,
+    height: 15,
+    color: '#FE5B01',
+    letterSpacing: 0.6,
+    marginBottom: 8,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
-  todayCircleNodeCompleted: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  todayCircleNode: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: '#FE5B01',
-    backgroundColor: '#2A170D',
+    borderColor: '#FF7A1A',
+    backgroundColor: '#151517',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
-    shadowColor: '#FE5B01',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  todayCircleNodePending: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1.5,
-    borderColor: '#FE5B01',
-    backgroundColor: '#2A170D',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-    shadowColor: '#FE5B01',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  todayPendingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FE5B01',
+    marginBottom: 7,
     shadowColor: '#FE5B01',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  todayCircleInnerRim: {
+    width: 31,
+    height: 31,
+    borderRadius: 15.5,
+    borderWidth: 0.8,
+    borderColor: 'rgba(255, 230, 210, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   todayDateNum: {
     fontFamily: fontFamilies.bold,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 16,
+    height: 16,
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 7,
+    textAlign: 'center',
+    includeFontPadding: false,
   },
   todayPillBadge: {
     backgroundColor: '#FE5B01',
     width: '100%',
-    paddingVertical: 4,
+    paddingVertical: 5,
     alignItems: 'center',
     justifyContent: 'center',
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
   },
   todayPillText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 9,
+    fontSize: 10,
     color: '#FFFFFF',
     letterSpacing: 0.8,
+    includeFontPadding: false,
   },
 
   /* BOTTOM CARD */
@@ -820,7 +911,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     position: 'relative',
     zIndex: 1,
-    paddingRight: 75,
+    paddingRight: 20,
   },
 
   /* PROGRESS RING SECTION */
@@ -829,7 +920,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ringWrapper: {
-    marginRight: 10,
+    marginRight: 6,
     position: 'relative',
     width: 48,
     height: 48,
@@ -871,7 +962,7 @@ const styles = StyleSheet.create({
     width: 1,
     height: 32,
     backgroundColor: '#26262E',
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
 
   /* ENCOURAGEMENT SECTION */
@@ -902,7 +993,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    width: 140,
+    width: 95,
     zIndex: 0,
     overflow: 'hidden',
     borderTopRightRadius: 14,

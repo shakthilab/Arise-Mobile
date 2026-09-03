@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Alert,
   Image,
@@ -11,7 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useScrollToTop } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
@@ -25,7 +26,7 @@ import { fontFamilies } from '@/theme/typography';
 
 // Modular Profile Components
 import { AvatarSelectionModal, getAvatarSource } from '@/components/profile/AvatarSelectionModal';
-export { getAvatarSource, GAMIFIED_ANIME_AVATARS } from '@/components/profile/AvatarSelectionModal';
+export { getAvatarSource } from '@/components/profile/AvatarSelectionModal';
 import { EditNameModal } from '@/components/profile/EditNameModal';
 import { EditProfileFormData, EditProfileModal } from '@/components/profile/EditProfileModal';
 import { GenericInfoModal } from '@/components/profile/GenericInfoModal';
@@ -33,14 +34,53 @@ import { InviteFriendsModal } from '@/components/profile/InviteFriendsModal';
 import { RateHunterModal } from '@/components/profile/RateHunterModal';
 import { RecentActivityModal } from '@/components/profile/RecentActivityModal';
 import { SystemSettingsModal } from '@/components/profile/SystemSettingsModal';
+import { WeeklyProgressCard } from '@/components/features/streaks/WeeklyProgressCard';
+
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { getCurrentUser, updateProfile, updateUserAvatar, type UpdateProfilePayload } from '@/services/api/auth.service';
+import { getUserSettings } from '@/services/api/settings.service';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
   const userAny = user as any;
 
-  // Measurement Units
-  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, [])
+  );
+
+  // Persistent Settings Store (Audio, Haptics, Notifications, Units)
+  const {
+    unitSystem,
+    setUnitSystem,
+    soundEffectsEnabled,
+    setSoundEffectsEnabled,
+    hapticsEnabled,
+    setHapticsEnabled,
+    allNotificationsEnabled,
+    setAllNotificationsEnabled,
+    dailyMotivationEnabled,
+    setDailyMotivationEnabled,
+    taskRemindersEnabled,
+    setTaskRemindersEnabled,
+    streakAtRiskEnabled,
+    setStreakAtRiskEnabled,
+    streakMilestonesEnabled,
+    setStreakMilestonesEnabled,
+    streakStatusAlertsEnabled,
+    setStreakStatusAlertsEnabled,
+    levelUpAlertsEnabled,
+    setLevelUpAlertsEnabled,
+    rewardReadyAlertsEnabled,
+    setRewardReadyAlertsEnabled,
+    announcementsEnabled,
+    setAnnouncementsEnabled,
+  } = useSettingsStore();
 
   // Modals Visibility
   const [isEditProfileModalVisible, setIsEditProfileModalVisible] = useState(false);
@@ -55,21 +95,6 @@ export default function ProfileScreen() {
   // Confirm Dialogs
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
-
-  // Audio & Haptics Settings
-  const [soundEffectsEnabled, setSoundEffectsEnabled] = useState(true);
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
-
-  // Notification Toggles
-  const [allNotificationsEnabled, setAllNotificationsEnabled] = useState(true);
-  const [dailyMotivationEnabled, setDailyMotivationEnabled] = useState(true);
-  const [taskRemindersEnabled, setTaskRemindersEnabled] = useState(true);
-  const [streakAtRiskEnabled, setStreakAtRiskEnabled] = useState(true);
-  const [streakMilestonesEnabled, setStreakMilestonesEnabled] = useState(true);
-  const [streakStatusAlertsEnabled, setStreakStatusAlertsEnabled] = useState(true);
-  const [levelUpAlertsEnabled, setLevelUpAlertsEnabled] = useState(true);
-  const [rewardReadyAlertsEnabled, setRewardReadyAlertsEnabled] = useState(true);
-  const [announcementsEnabled, setAnnouncementsEnabled] = useState(true);
 
   // Account Deletion Checker
   useEffect(() => {
@@ -87,13 +112,28 @@ export default function ProfileScreen() {
     }
   }, [userAny?.delete_at, logout]);
 
+  // Sync account settings from backend on mount
+  useEffect(() => {
+    let isMounted = true;
+    getUserSettings()
+      .then((settings) => {
+        if (isMounted && settings?.units) {
+          setUnitSystem(settings.units);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [setUnitSystem]);
+
   // Handlers
   const handleUnitSystemChange = (system: 'metric' | 'imperial') => {
     setUnitSystem(system);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
   };
 
-  const handleSaveProfileForm = (updatedForm: EditProfileFormData) => {
+  const handleSaveProfileForm = async (updatedForm: EditProfileFormData) => {
     if (user && updatedForm.name.trim()) {
       let heightInCm = 181;
       const heightVal = parseFloat(updatedForm.height);
@@ -115,20 +155,54 @@ export default function ProfileScreen() {
         }
       }
 
-      setUser({
-        ...user,
-        displayName: updatedForm.name.trim(),
-        name: updatedForm.name.trim(),
-        gender: updatedForm.gender,
-        date_of_birth: updatedForm.birthday,
-        height_cm: heightInCm,
-        weight_kg: weightInKg,
-        height_unit: updatedForm.heightUnit,
-        weight_unit: updatedForm.weightUnit,
-      } as any);
+      let formattedBirthday = updatedForm.birthday;
+      if (updatedForm.birthday) {
+        const parts = updatedForm.birthday.split('/');
+        if (parts.length === 3) {
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          let year = parts[2];
+          if (year.length === 2) {
+            const numYear = parseInt(year, 10);
+            year = numYear > 30 ? `19${year}` : `20${year}`;
+          }
+          formattedBirthday = `${day}/${month}/${year}`;
+        }
+      }
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
-      Alert.alert('Profile Updated', 'Your hunter records have been saved.');
+      const payload: UpdateProfilePayload = {
+        name: updatedForm.name.trim(),
+        gender: updatedForm.gender.toUpperCase(),
+        birthday: formattedBirthday,
+        height: heightInCm,
+        weight: weightInKg,
+      };
+
+      if (updatedForm.avatar_id !== undefined && updatedForm.avatar_id !== null) {
+        payload.avatar_id = Number(updatedForm.avatar_id) || updatedForm.avatar_id;
+      }
+
+      try {
+        const updatedUserFromPatch = await updateProfile(payload);
+        setUser(updatedUserFromPatch);
+
+        // Fetch fresh user data from /auth/me to refresh UI state completely
+        try {
+          const freshUser = await getCurrentUser();
+          if (freshUser) {
+            setUser(freshUser);
+          }
+        } catch (meError) {
+          console.warn('[Profile] Failed to refresh user profile via getCurrentUser:', meError);
+        }
+
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+        Alert.alert('Profile Updated', 'Your profile records have been saved.');
+      } catch (err: any) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => { });
+        Alert.alert('Update Failed', err.message || 'Failed to update profile.');
+        throw err;
+      }
     }
   };
 
@@ -139,9 +213,32 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSelectAvatar = (assetKey: string) => {
+  const handleSelectAvatar = async (avatarId: string, avatarUrl: string, isChanged?: boolean) => {
+    const currentIdStr = String(userAny?.avatar_id ?? '');
+    const currentUrlStr = String(user?.avatarUrl ?? '');
+
+    // If the user didn't change the avatar, DO NOT call any API!
+    if (isChanged === false || (currentIdStr === String(avatarId) && currentUrlStr === String(avatarUrl))) {
+      setIsAvatarModalVisible(false);
+      return;
+    }
+
     if (user) {
-      setUser({ ...user, avatarUrl: assetKey });
+      setUser({ ...user, avatarUrl, avatar_id: avatarId } as any);
+      try {
+        const updatedUser = await updateUserAvatar(Number(avatarId) || avatarId);
+        setUser(updatedUser);
+        try {
+          const freshUser = await getCurrentUser();
+          if (freshUser) {
+            setUser(freshUser);
+          }
+        } catch {}
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+      } catch (err: any) {
+        console.warn('[Profile] Failed to update avatar on backend:', err);
+        Alert.alert('Avatar Update Failed', err.message || 'Failed to update avatar.');
+      }
     }
     setIsAvatarModalVisible(false);
   };
@@ -225,12 +322,13 @@ export default function ProfileScreen() {
 
   const displayName = userAny?.name ?? user?.displayName ?? 'Shadow Hunter';
   const level = user?.level ?? 12;
-  const currentAvatarSource = getAvatarSource(user?.avatarUrl);
+  const currentAvatarSource = getAvatarSource(user?.avatarUrl, userAny?.avatar_id);
   const referralCode = userAny?.referral_code ?? '45JLFI17';
 
   return (
     <Screen style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
@@ -365,6 +463,14 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* WEEKLY CAMPAIGN PROGRESS CARD (Commented out)
+        <WeeklyProgressCard
+          weekStatus={user?.week_status}
+          completedDaysCount={user?.completedDaysCount}
+          avatarUrl={user?.avatarUrl}
+        />
+        */}
+
         {/* MAIN MENU OPTIONS CARD */}
         <View style={styles.menuContainer}>
           <MenuItem
@@ -374,7 +480,7 @@ export default function ProfileScreen() {
           />
           <MenuItem
             icon="time-outline"
-            label="Your Activity"
+            label="Activities"
             onPress={() => handleMenuPress('activity')}
           />
           <MenuItem
@@ -549,6 +655,7 @@ export default function ProfileScreen() {
         visible={isAvatarModalVisible}
         onClose={() => setIsAvatarModalVisible(false)}
         currentAvatar={user?.avatarUrl}
+        currentAvatarId={userAny?.avatar_id}
         onSelectAvatar={handleSelectAvatar}
       />
 

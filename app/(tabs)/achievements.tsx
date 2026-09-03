@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Alert,
   Dimensions,
@@ -13,7 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useScrollToTop } from '@react-navigation/native';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
@@ -198,6 +199,14 @@ const STREAK_TROPHIES: StreakTrophy[] = [
 export default function AchievementsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'badges' | 'streaks'>('badges');
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, [])
+  );
 
   const handleContactSupport = async () => {
     const email = 'support@hunterx.app';
@@ -257,6 +266,7 @@ export default function AchievementsScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >

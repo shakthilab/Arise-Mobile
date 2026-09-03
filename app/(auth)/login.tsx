@@ -40,8 +40,10 @@ export default function LoginScreen() {
   const formAnim = useRef(new Animated.Value(0)).current;
   const buttonAnim = useRef(new Animated.Value(0)).current;
   const socialAnim = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
     Animated.stagger(140, [
       Animated.timing(heroAnim, {
         toValue: 1,
@@ -127,6 +129,7 @@ export default function LoginScreen() {
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={false}

@@ -54,6 +54,7 @@ export default function BiometricsScreen() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const ageScrollRef = useRef<ScrollView>(null);
+  const mainScrollRef = useRef<ScrollView>(null);
 
   // Animations
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -107,6 +108,8 @@ export default function BiometricsScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    mainScrollRef.current?.scrollTo({ y: 0, animated: false });
 
     // Scroll Age ruler to initial value horizontally
     setTimeout(() => {
@@ -213,6 +216,7 @@ export default function BiometricsScreen() {
 
       {/* ─── Scrollable Content ─── */}
       <ScrollView
+        ref={mainScrollRef}
         scrollEnabled={scrollEnabled}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"

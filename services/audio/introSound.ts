@@ -1,6 +1,7 @@
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import { useSettingsStore } from '@/store/useSettingsStore';
 
 let globalIntroSound: Audio.Sound | null = null;
 let hapticTimers: any[] = [];
@@ -12,6 +13,7 @@ export function clearIntroHaptics(): void {
 
 export function triggerIntroHaptics(): void {
   clearIntroHaptics();
+  if (!useSettingsStore.getState().hapticsEnabled) return;
 
   // 1. Initial surge strike (0ms)
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
@@ -27,22 +29,32 @@ export function triggerIntroHaptics(): void {
 
   sequence.forEach(({ delay, style }) => {
     const timer = setTimeout(() => {
-      Haptics.impactAsync(style).catch(() => {});
+      if (useSettingsStore.getState().hapticsEnabled) {
+        Haptics.impactAsync(style).catch(() => {});
+      }
     }, delay);
     hapticTimers.push(timer);
   });
 }
 
 export async function playIntroAudio(withHaptics: boolean = true): Promise<Audio.Sound | null> {
+  const { soundEffectsEnabled, hapticsEnabled } = useSettingsStore.getState();
+  if (!soundEffectsEnabled && !hapticsEnabled) return null;
+
   try {
     if (globalIntroSound) {
       const status = await globalIntroSound.getStatusAsync();
       if (status.isLoaded && status.isPlaying) {
-        if (withHaptics) triggerIntroHaptics();
+        if (withHaptics && hapticsEnabled) triggerIntroHaptics();
         return globalIntroSound;
       }
       await globalIntroSound.unloadAsync().catch(() => {});
       globalIntroSound = null;
+    }
+
+    if (!soundEffectsEnabled) {
+      if (withHaptics && hapticsEnabled) triggerIntroHaptics();
+      return null;
     }
 
     await Audio.setAudioModeAsync({

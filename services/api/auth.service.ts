@@ -20,6 +20,12 @@ export function mapBackendUserToUser(u: any): User {
   const weekStatusCompletedCount = u.week_status?.days
     ? u.week_status.days.filter((d: any) => d.status === 'DONE' || d.status === 'COMPLETED').length
     : undefined;
+
+  const heightInCm = u.height_cm ?? u.height;
+  const weightInKg = u.weight_kg ?? u.weight;
+  const dob = u.date_of_birth || u.dob || u.birthday;
+  const proteinGoal = u.daily_protein_goal ?? u.protein_goal;
+
   return {
     ...u,
     id: u.id ? u.id.toString() : '',
@@ -33,6 +39,15 @@ export function mapBackendUserToUser(u: any): User {
     completedDaysCount: u.completedDaysCount ?? weekStatusCompletedCount ?? weeklyStreak,
     user_progression: progression,
     week_status: u.week_status,
+    height_cm: heightInCm,
+    height: heightInCm,
+    weight_kg: weightInKg,
+    weight: weightInKg,
+    date_of_birth: dob,
+    dob: dob,
+    birthday: dob,
+    daily_protein_goal: proteinGoal,
+    protein_goal: proteinGoal,
   };
 }
 
@@ -177,9 +192,29 @@ export async function logout(): Promise<void> {
 // access token (and transparently refreshes it on a 401), so this just
 // confirms it's still valid and fetches the user it belongs to.
 export async function getCurrentUser(): Promise<User> {
-  const { data } = await apiClient.get<ApiResponse<{ user: User }>>('/auth/me');
-  if (!data.success) throw new Error(data.error.message);
-  return mapBackendUserToUser(data.data.user);
+  try {
+    const { data } = await apiClient.get<ApiResponse<{ user: User } | User>>('/auth/me');
+    if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+      throw new Error((data as any).error?.message || 'Failed to fetch profile');
+    }
+    const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+    return mapBackendUserToUser(rawUser);
+  } catch (err: any) {
+    const isNotFound = err?.response?.status === 404 || (err?.message && err.message.includes('404'));
+    if (isNotFound) {
+      try {
+        const { data } = await apiClient.get<ApiResponse<{ user: User } | User>>('/api/auth/me');
+        if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+          throw new Error((data as any).error?.message || 'Failed to fetch profile');
+        }
+        const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+        return mapBackendUserToUser(rawUser);
+      } catch (innerErr: any) {
+        throw new Error(extractErrorMessage(innerErr));
+      }
+    }
+    throw new Error(extractErrorMessage(err));
+  }
 }
 
 // For an already-authenticated user whose onboarding isn't done yet — e.g.
@@ -341,3 +376,98 @@ export async function resetPassword(token: string, newPassword: string, confirmP
     throw new Error(extractErrorMessage(err));
   }
 }
+
+export type UpdateProfilePayload = {
+  name?: string;
+  gender?: string;
+  birthday?: string;
+  height?: number;
+  weight?: number;
+  avatar_id?: number | string;
+};
+
+export async function updateProfile(payload: UpdateProfilePayload): Promise<User> {
+  try {
+    const { data } = await apiClient.patch<ApiResponse<{ user: User } | User>>('/auth/profile', payload);
+    if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+      throw new Error((data as any).error?.message || 'Failed to update profile');
+    }
+    const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+    return mapBackendUserToUser(rawUser);
+  } catch (err: any) {
+    const isNotFound = err?.response?.status === 404 || (err?.message && err.message.includes('404'));
+    if (isNotFound) {
+      try {
+        const { data } = await apiClient.patch<ApiResponse<{ user: User } | User>>('/api/auth/profile', payload);
+        if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+          throw new Error((data as any).error?.message || 'Failed to update profile');
+        }
+        const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+        return mapBackendUserToUser(rawUser);
+      } catch (innerErr: any) {
+        throw new Error(extractErrorMessage(innerErr));
+      }
+    }
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+export async function updateUserAvatar(avatarId: number | string): Promise<User> {
+  const numId = typeof avatarId === 'string' ? parseInt(avatarId, 10) : avatarId;
+  const payload = { avatarId: isNaN(numId) ? avatarId : numId };
+
+  try {
+    const { data } = await apiClient.patch<ApiResponse<{ user: User } | User>>('/users/me/avatar', payload);
+    if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+      throw new Error((data as any).error?.message || 'Failed to update avatar');
+    }
+    const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+    return mapBackendUserToUser(rawUser);
+  } catch (err: any) {
+    const isNotFound = err?.response?.status === 404 || (err?.message && err.message.includes('404'));
+    if (isNotFound) {
+      try {
+        const { data } = await apiClient.patch<ApiResponse<{ user: User } | User>>('/api/users/me/avatar', payload);
+        if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+          throw new Error((data as any).error?.message || 'Failed to update avatar');
+        }
+        const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+        return mapBackendUserToUser(rawUser);
+      } catch (innerErr: any) {
+        throw new Error(extractErrorMessage(innerErr));
+      }
+    }
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+export async function updateUserEmail(email: string): Promise<User> {
+  const payload = { email: email.trim() };
+
+  try {
+    const { data } = await apiClient.patch<ApiResponse<{ user: User } | User>>('/users/me/email', payload);
+    if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+      throw new Error((data as any).error?.message || 'Failed to update email');
+    }
+    const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+    return mapBackendUserToUser(rawUser);
+  } catch (err: any) {
+    const isNotFound = err?.response?.status === 404 || (err?.message && err.message.includes('404'));
+    if (isNotFound) {
+      try {
+        const { data } = await apiClient.patch<ApiResponse<{ user: User } | User>>('/api/users/me/email', payload);
+        if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+          throw new Error((data as any).error?.message || 'Failed to update email');
+        }
+        const rawUser = (data as any)?.data?.user || (data as any)?.data || (data as any)?.user || data;
+        return mapBackendUserToUser(rawUser);
+      } catch (innerErr: any) {
+        throw new Error(extractErrorMessage(innerErr));
+      }
+    }
+    throw new Error(extractErrorMessage(err));
+  }
+}
+
+
+

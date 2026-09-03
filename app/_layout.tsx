@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as WebBrowser from 'expo-web-browser';
@@ -22,11 +22,65 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { GlobalToast } from '@/components/common/GlobalToast';
 import { preloadAppAssets } from '@/services/media/preloadAssets';
 
+import { SettingsProvider } from '@/context/SettingsContext';
+
 SplashScreen.preventAutoHideAsync();
 
 // Lets the popup window opened for web Google sign-in (services/auth/googleAuthWeb)
 // signal completion back to the tab that opened it. No-op on native.
 WebBrowser.maybeCompleteAuthSession();
+
+function ScrollToTopOnNavigate() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      if ('scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual';
+      }
+    } catch (_) {}
+
+    const resetScroll = () => {
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        if (document.documentElement) {
+          document.documentElement.scrollTop = 0;
+        }
+        if (document.body) {
+          document.body.scrollTop = 0;
+        }
+
+        // Also reset scroll on all scrollable elements in the page
+        const scrollableElements = document.querySelectorAll<HTMLElement>(
+          '[data-testid="scroll-view"], [style*="overflow"], div'
+        );
+        for (let i = 0; i < scrollableElements.length; i++) {
+          const el = scrollableElements[i];
+          if (el && el.scrollTop > 0) {
+            el.scrollTop = 0;
+          }
+        }
+      } catch (_) {}
+    };
+
+    resetScroll();
+    const rafId = requestAnimationFrame(resetScroll);
+    const t1 = setTimeout(resetScroll, 30);
+    const t2 = setTimeout(resetScroll, 100);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [pathname]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -82,19 +136,23 @@ export default function RootLayout() {
           insets from the same React context instead of each relying on native
           view measurement (unreliable inside Modals). See Screen.tsx. */}
       <SafeAreaProvider>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        >
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(onboarding)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <GlobalToast />
+        <SettingsProvider>
+          <StatusBar style="light" />
+          <ScrollToTopOnNavigate />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              gestureEnabled: false,
+              contentStyle: { backgroundColor: colors.background },
+            }}
+          >
+            <Stack.Screen name="(auth)" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="(onboarding)" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <GlobalToast />
+        </SettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

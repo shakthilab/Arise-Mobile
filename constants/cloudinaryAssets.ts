@@ -5,16 +5,6 @@
 
 export const CLOUDINARY_ASSETS: Record<string, { uri: string }> = {
   active_campaign_bg: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861185/hunterx/app-assets/active_campaign_bg.jpg' },
-  arise_avatar_1: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861187/hunterx/app-assets/arise_avatar_1.png' },
-  arise_avatar_10: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861188/hunterx/app-assets/arise_avatar_10.png' },
-  arise_avatar_2: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861190/hunterx/app-assets/arise_avatar_2.png' },
-  arise_avatar_3: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861192/hunterx/app-assets/arise_avatar_3.png' },
-  arise_avatar_4: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861193/hunterx/app-assets/arise_avatar_4.png' },
-  arise_avatar_5: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861195/hunterx/app-assets/arise_avatar_5.png' },
-  arise_avatar_6: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861196/hunterx/app-assets/arise_avatar_6.png' },
-  arise_avatar_7: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861198/hunterx/app-assets/arise_avatar_7.png' },
-  arise_avatar_8: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861199/hunterx/app-assets/arise_avatar_8.png' },
-  arise_avatar_9: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861200/hunterx/app-assets/arise_avatar_9.png' },
   badge_cursed_bound: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861202/hunterx/app-assets/badge_cursed_bound.jpg' },
   badge_dragon_soul: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861203/hunterx/app-assets/badge_dragon_soul.jpg' },
   badge_phoenix_heart: { uri: 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1787861204/hunterx/app-assets/badge_phoenix_heart.jpg' },

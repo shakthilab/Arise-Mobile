@@ -71,8 +71,10 @@ export default function AssessmentScreen() {
     const headerAnim = useRef(new Animated.Value(0)).current;
     const listAnim = useRef(new Animated.Value(0)).current;
     const buttonAnim = useRef(new Animated.Value(0)).current;
+    const scrollRef = useRef<ScrollView>(null);
 
     useEffect(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
         Animated.stagger(150, [
             Animated.timing(headerAnim, {
                 toValue: 1,
@@ -146,6 +148,7 @@ export default function AssessmentScreen() {
 
             {/* ─── Scrollable Content ─── */}
             <ScrollView
+                ref={scrollRef}
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}

@@ -1,6 +1,6 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { Tabs, useFocusEffect, usePathname, useRouter } from 'expo-router';
+import { BackHandler, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -8,6 +8,32 @@ import { colors } from '@/theme/colors';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Hardware back button handler to prevent back navigation to auth/onboarding screens
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        // If on the Home tab, intercept back press so it never goes back to login/onboarding
+        if (
+          pathname === '/(tabs)' ||
+          pathname === '/(tabs)/' ||
+          pathname === '/(tabs)/index' ||
+          pathname === '/'
+        ) {
+          return true; // Blocks native back press from returning to onboarding/auth
+        }
+
+        // If on another tab (Profile, Battles, Inventory), navigate back to Home tab
+        router.navigate('/(tabs)');
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [pathname, router])
+  );
 
   return (
     <Tabs

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   ScrollView,
@@ -8,156 +9,105 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 import { fontFamilies } from '@/theme/typography';
+import { getAvatars, getCachedAvatars, type AvatarItem } from '@/services/api/avatar.service';
 
-export interface AnimeAvatarItem {
-  id: string;
-  name: string;
-  tag: string;
-  rarity: 'LEGENDARY' | 'EPIC' | 'RARE';
-  assetKey: string;
-  source: any;
-}
+export const DEFAULT_FALLBACK_AVATAR = 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1788468328/hunterx/app-assets/arise_avatar_11.jpg';
 
-export const GAMIFIED_ANIME_AVATARS: AnimeAvatarItem[] = [
-  {
-    id: 'arise_1',
-    name: 'Shadow Hunter I',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_1',
-    source: CLOUDINARY_ASSETS.arise_avatar_1,
-  },
-  {
-    id: 'arise_2',
-    name: 'Shadow Hunter II',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_2',
-    source: CLOUDINARY_ASSETS.arise_avatar_2,
-  },
-  {
-    id: 'arise_3',
-    name: 'Shadow Hunter III',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_3',
-    source: CLOUDINARY_ASSETS.arise_avatar_3,
-  },
-  {
-    id: 'arise_4',
-    name: 'Shadow Hunter IV',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_4',
-    source: CLOUDINARY_ASSETS.arise_avatar_4,
-  },
-  {
-    id: 'arise_5',
-    name: 'Shadow Hunter V',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_5',
-    source: CLOUDINARY_ASSETS.arise_avatar_5,
-  },
-  {
-    id: 'arise_6',
-    name: 'Shadow Hunter VI',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_6',
-    source: CLOUDINARY_ASSETS.arise_avatar_6,
-  },
-  {
-    id: 'arise_7',
-    name: 'Shadow Hunter VII',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_7',
-    source: CLOUDINARY_ASSETS.arise_avatar_7,
-  },
-  {
-    id: 'arise_8',
-    name: 'Shadow Hunter VIII',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_8',
-    source: CLOUDINARY_ASSETS.arise_avatar_8,
-  },
-  {
-    id: 'arise_9',
-    name: 'Shadow Hunter IX',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_9',
-    source: CLOUDINARY_ASSETS.arise_avatar_9,
-  },
-  {
-    id: 'arise_10',
-    name: 'Shadow Hunter X',
-    tag: 'S-RANK HUNTER',
-    rarity: 'LEGENDARY',
-    assetKey: 'arise_10',
-    source: CLOUDINARY_ASSETS.arise_avatar_10,
-  },
-];
+export const getAvatarSource = (
+  avatarUrl: string | null | undefined,
+  avatarId?: string | number | null
+) => {
+  const list = getCachedAvatars();
+  const firstAvatarUrl = list && list.length > 0 ? list[0].image_url : DEFAULT_FALLBACK_AVATAR;
 
-export const getAvatarSource = (avatarUrl: string | null | undefined) => {
-  if (!avatarUrl || avatarUrl === 'char_naruto' || avatarUrl === 'naruto.jpg') {
-    return CLOUDINARY_ASSETS.arise_avatar_2;
-  }
-  if (avatarUrl === 'char_luffy' || avatarUrl === 'luffy.jpg') {
-    return CLOUDINARY_ASSETS.arise_avatar_2;
-  }
-  if (avatarUrl === 'char_gojo' || avatarUrl === 'gojo.jpg') {
-    return CLOUDINARY_ASSETS.arise_avatar_3;
-  }
-  if (avatarUrl === 'char_itachi' || avatarUrl === 'itachi.jpg') {
-    return CLOUDINARY_ASSETS.arise_avatar_4;
-  }
-  if (avatarUrl === 'char_goku' || avatarUrl === 'goku.jpg') {
-    return CLOUDINARY_ASSETS.arise_avatar_5;
-  }
-  if (avatarUrl === 'char_jinwoo' || avatarUrl === 'jinwoo.jpg') {
-    return CLOUDINARY_ASSETS.arise_avatar_6;
+  if (!avatarUrl && !avatarId) {
+    return { uri: firstAvatarUrl };
   }
 
-  // Custom arise keys
-  if (avatarUrl === 'arise_1') return CLOUDINARY_ASSETS.arise_avatar_1;
-  if (avatarUrl === 'arise_2') return CLOUDINARY_ASSETS.arise_avatar_2;
-  if (avatarUrl === 'arise_3') return CLOUDINARY_ASSETS.arise_avatar_3;
-  if (avatarUrl === 'arise_4') return CLOUDINARY_ASSETS.arise_avatar_4;
-  if (avatarUrl === 'arise_5') return CLOUDINARY_ASSETS.arise_avatar_5;
-  if (avatarUrl === 'arise_6') return CLOUDINARY_ASSETS.arise_avatar_6;
-  if (avatarUrl === 'arise_7') return CLOUDINARY_ASSETS.arise_avatar_7;
-  if (avatarUrl === 'arise_8') return CLOUDINARY_ASSETS.arise_avatar_8;
-  if (avatarUrl === 'arise_9') return CLOUDINARY_ASSETS.arise_avatar_9;
-  if (avatarUrl === 'arise_10') return CLOUDINARY_ASSETS.arise_avatar_10;
-
-  const found = GAMIFIED_ANIME_AVATARS.find(
-    (a) => a.assetKey === avatarUrl || a.id === avatarUrl
-  );
-  if (found) return found.source;
-  if (typeof avatarUrl === 'string' && avatarUrl.startsWith('http')) {
+  if (avatarUrl && typeof avatarUrl === 'string' && (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://'))) {
     return { uri: avatarUrl };
   }
-  return CLOUDINARY_ASSETS.arise_avatar_2;
+
+  const searchKey = String(avatarId || avatarUrl);
+  if (list && list.length > 0) {
+    const matched = list.find((a) => String(a.id) === searchKey || a.image_url === searchKey);
+    if (matched && matched.image_url) {
+      return { uri: matched.image_url };
+    }
+  }
+
+  return { uri: firstAvatarUrl };
 };
 
 export interface AvatarSelectionModalProps {
   visible: boolean;
   onClose: () => void;
   currentAvatar?: string | null;
-  onSelectAvatar: (assetKey: string) => void;
+  currentAvatarId?: string | number | null;
+  onSelectAvatar: (avatarId: string, avatarUrl: string, isChanged?: boolean) => void;
 }
 
 export function AvatarSelectionModal({
   visible,
   onClose,
   currentAvatar,
+  currentAvatarId,
   onSelectAvatar,
 }: AvatarSelectionModalProps) {
+  const [avatars, setAvatars] = useState<AvatarItem[]>(getCachedAvatars() || []);
+  const [isLoading, setIsLoading] = useState(!getCachedAvatars());
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (visible) {
+      getAvatars()
+        .then((items) => {
+          if (isMounted) {
+            setAvatars(items);
+            setIsLoading(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setIsLoading(false);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (visible && avatars.length > 0) {
+      // Find matching avatar by ID or URL, else default to 1st avatar (avatars[0])
+      const searchKey = String(currentAvatarId || currentAvatar || '');
+      const matched = avatars.find(
+        (a) => String(a.id) === searchKey || a.image_url === searchKey
+      );
+      if (matched) {
+        setSelectedAvatarId(matched.id);
+      } else {
+        setSelectedAvatarId(avatars[0].id);
+      }
+    }
+  }, [visible, avatars, currentAvatar, currentAvatarId]);
+
+  const handleSave = () => {
+    const activeItem = avatars.find((a) => a.id === selectedAvatarId) || avatars[0];
+    if (activeItem) {
+      const currentIdStr = String(currentAvatarId ?? '');
+      const selectedIdStr = String(activeItem.id);
+      const isChanged =
+        currentIdStr !== ''
+          ? currentIdStr !== selectedIdStr
+          : !!currentAvatar && currentAvatar !== activeItem.image_url;
+
+      onSelectAvatar(activeItem.id, activeItem.image_url, isChanged);
+    }
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
@@ -172,45 +122,51 @@ export function AvatarSelectionModal({
 
           {/* Horizontal Circular Avatar List */}
           <View style={styles.avatarCarouselWrapper}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.avatarCarouselContent}
-            >
-              {GAMIFIED_ANIME_AVATARS.map((item) => {
-                const isSelected = currentAvatar
-                  ? currentAvatar === item.assetKey || currentAvatar === item.id
-                  : item.id === 'arise_2';
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FE5B01" />
+              </View>
+            ) : avatars.length === 0 ? (
+              <Text style={styles.noAvatarsText}>No avatars available</Text>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.avatarCarouselContent}
+              >
+                {avatars.map((item) => {
+                  const isSelected = item.id === selectedAvatarId;
 
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[
-                      styles.circularAvatarWrapper,
-                      isSelected
-                        ? styles.circularAvatarSelected
-                        : styles.circularAvatarUnselected,
-                    ]}
-                    onPress={() => onSelectAvatar(item.assetKey)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.circularAvatarFrame}>
-                      <Image
-                        source={item.source}
-                        style={styles.circularAvatarImage}
-                        resizeMode="cover"
-                      />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.circularAvatarWrapper,
+                        isSelected
+                          ? styles.circularAvatarSelected
+                          : styles.circularAvatarUnselected,
+                      ]}
+                      onPress={() => setSelectedAvatarId(item.id)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.circularAvatarFrame}>
+                        <Image
+                          source={{ uri: item.image_url }}
+                          style={styles.circularAvatarImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
 
           {/* Save Button */}
           <TouchableOpacity
             style={styles.cancelActionBtn}
-            onPress={onClose}
+            onPress={handleSave}
             activeOpacity={0.8}
           >
             <Text style={styles.cancelActionText}>SAVE</Text>
@@ -256,6 +212,19 @@ const styles = StyleSheet.create({
   avatarCarouselWrapper: {
     width: '100%',
     marginVertical: 4,
+    minHeight: 84,
+    justifyContent: 'center',
+  },
+  loadingContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noAvatarsText: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 14,
+    color: '#71717A',
+    textAlign: 'center',
   },
   avatarCarouselContent: {
     flexDirection: 'row',
