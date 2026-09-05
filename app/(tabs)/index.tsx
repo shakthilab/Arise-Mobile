@@ -20,7 +20,7 @@ import { LootDropModal } from '@/components/features/loot/LootDropModal';
 import { QuestActionModal } from '@/components/features/missions/QuestActionModal';
 import { TaskCompletedToast } from '@/components/features/missions/TaskCompletedToast';
 import { TaskCompletionScreen } from '@/components/features/missions/TaskCompletionScreen';
-import { WeeklyTracker } from '@/components/features/streaks/WeeklyTracker';
+import { WeeklyTracker, StreakReminderModal, type StreakReminderStage } from '@/components/features/streaks';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { useLootDrop } from '@/hooks/useLootDrop';
@@ -198,6 +198,8 @@ export default function MissionsHomeScreen() {
   const [completedToastVisible, setCompletedToastVisible] = useState(false);
   const [dayCompleteModalVisible, setDayCompleteModalVisible] = useState(false);
   const [toastXp, setToastXp] = useState(10);
+  const [streakReminderVisible, setStreakReminderVisible] = useState(false);
+  const [streakReminderStage, setStreakReminderStage] = useState<StreakReminderStage>('active_warning');
 
   const displayName = user?.displayName ? user.displayName.toUpperCase() : 'SEYMEN';
   const displayXP = (user?.xp ?? 1240).toLocaleString();
@@ -221,6 +223,14 @@ export default function MissionsHomeScreen() {
 
   const dailyTodoQuests = todoQuests.filter((q) => q.type === 'daily');
   const weeklyTodoQuests = todoQuests.filter((q) => q.type === 'weekly');
+
+  // Automatically trigger the Streak Missed Day animation modal on app open
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setStreakReminderVisible(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Automatically pop up DayCompleteScreen celebration when all tasks are completed
   useEffect(() => {
@@ -297,21 +307,6 @@ export default function MissionsHomeScreen() {
     );
   };
 
-  if (activeTab === 'todo' && todoQuests.length === 0) {
-    return (
-      <Screen style={{ backgroundColor: '#0A0A0A', flex: 1 }}>
-        <DayCompleteScreen
-          quests={quests}
-          onContinue={() => {
-            setQuests((prev) =>
-              prev.map((q) => ({ ...q, status: 'todo', earnedXp: undefined }))
-            );
-          }}
-        />
-      </Screen>
-    );
-  }
-
   return (
     <Screen style={styles.screen}>
       <ScrollView
@@ -335,10 +330,25 @@ export default function MissionsHomeScreen() {
           </View>
 
           <View style={styles.headerActions}>
-            <View style={styles.streakPill}>
+            <TouchableOpacity
+              style={styles.streakPill}
+              activeOpacity={0.8}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setStreakReminderVisible(true);
+              }}
+              onLongPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                // Cycle between the 3 stages: active_warning -> weak -> lost
+                setStreakReminderStage((prev) =>
+                  prev === 'active_warning' ? 'weak' : prev === 'weak' ? 'lost' : 'active_warning'
+                );
+                setStreakReminderVisible(true);
+              }}
+            >
               <Ionicons name="flame" size={20} color="#FF5500" />
               <Text style={styles.streakText}>{displayStreak}</Text>
-            </View>
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.iconButton}>
               <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
@@ -733,9 +743,21 @@ export default function MissionsHomeScreen() {
       {dayCompleteModalVisible && (
         <DayCompleteScreen
           quests={quests}
-          onContinue={() => setDayCompleteModalVisible(false)}
+          onContinue={() => {
+            setDayCompleteModalVisible(false);
+          }}
         />
       )}
+
+      {/* Streak Missed Day Reminder Animation Modal */}
+      <StreakReminderModal
+        visible={streakReminderVisible}
+        stage={streakReminderStage}
+        onDismiss={() => setStreakReminderVisible(false)}
+        onAction={() => {
+          setStreakReminderVisible(false);
+        }}
+      />
     </Screen>
   );
 }
