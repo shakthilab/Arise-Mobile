@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   Image,
   Linking,
   Platform,
@@ -39,10 +41,14 @@ import { WeeklyProgressCard } from '@/components/features/streaks/WeeklyProgress
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { getCurrentUser, updateProfile, updateUserAvatar, type UpdateProfilePayload } from '@/services/api/auth.service';
 import { getUserSettings } from '@/services/api/settings.service';
+import { useAvatarsReady } from '@/services/api/avatar.service';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
+  // Re-renders once the avatar catalog loads so the header avatar reflects
+  // the user's actual avatar_id instead of the generic fallback image.
+  useAvatarsReady();
   const userAny = user as any;
 
   const scrollRef = useRef<ScrollView>(null);
@@ -321,9 +327,59 @@ export default function ProfileScreen() {
   };
 
   const displayName = userAny?.name ?? user?.displayName ?? 'Shadow Hunter';
-  const level = user?.level ?? 12;
+  const progression = userAny?.user_progression || user?.user_progression || {};
+  const level = progression?.current_level ?? user?.level ?? 1;
+  const rankName = (
+    progression?.rank_name ||
+    progression?.rank ||
+    progression?.current_level_name ||
+    userAny?.rank ||
+    'DORMANT'
+  ).toUpperCase();
+
+  const currentXp = progression?.total_xp ?? user?.xp ?? 0;
+  const nextLevelXp = progression?.next_level_xp_required ?? progression?.next_level_required_xp ?? 0;
+  const xpUntilNext = nextLevelXp > currentXp ? nextLevelXp - currentXp : 0;
+  const progressPct = nextLevelXp > 0
+    ? Math.min(100, Math.max(0, Math.round((currentXp / nextLevelXp) * 100)))
+    : 0;
+
   const currentAvatarSource = getAvatarSource(user?.avatarUrl, userAny?.avatar_id);
   const referralCode = userAny?.referral_code ?? '45JLFI17';
+
+  // Animated XP loader values
+  const xpAnim = useRef(new Animated.Value(0)).current;
+  const [displayPct, setDisplayPct] = useState(0);
+
+  // Load from initial current level progress on focus / mount
+  useFocusEffect(
+    useCallback(() => {
+      xpAnim.setValue(0);
+      setDisplayPct(0);
+      const anim = Animated.timing(xpAnim, {
+        toValue: progressPct,
+        duration: 1200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      });
+
+      const listenerId = xpAnim.addListener(({ value }) => {
+        setDisplayPct(Math.round(value));
+      });
+
+      anim.start();
+
+      return () => {
+        xpAnim.removeListener(listenerId);
+      };
+    }, [progressPct, xpAnim])
+  );
+
+  const xpWidthInterpolate = xpAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
+  });
 
   return (
     <Screen style={styles.screen}>
@@ -409,13 +465,6 @@ export default function ProfileScreen() {
                   <Text style={styles.userName} numberOfLines={1}>
                     {displayName}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.editIconBtn}
-                    onPress={() => setIsEditNameModalVisible(true)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="pencil" size={13} color="#D4D4D8" />
-                  </TouchableOpacity>
                 </View>
 
                 {/* Invite Icon Button */}
@@ -435,7 +484,7 @@ export default function ProfileScreen() {
                   size={14}
                   color="#FE5B01"
                 />
-                <Text style={styles.classText}>VANGUARD</Text>
+                <Text style={styles.classText}>{rankName}</Text>
               </View>
             </View>
           </View>
@@ -444,21 +493,28 @@ export default function ProfileScreen() {
           <View style={styles.xpSection}>
             <View style={styles.xpHeaderRow}>
               <Text style={styles.xpTitleText}>EXPERIENCE TRACKER</Text>
-              <Text style={styles.xpPercentText}>97%</Text>
+              <Text style={styles.xpPercentText}>{displayPct}%</Text>
             </View>
 
-            {/* Progress Bar */}
+            {/* Progress Bar Track */}
             <View style={styles.progressBarTrack}>
-              <LinearGradient
-                colors={['#EA580C', '#FE5B01', '#FBBF24']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.progressBarFill, { width: '97%' }]}
-              />
+              <Animated.View
+                style={[
+                  styles.progressBarFill,
+                  { width: xpWidthInterpolate },
+                ]}
+              >
+                <LinearGradient
+                  colors={['#EA580C', '#FE5B01', '#FBBF24']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.progressGradientFill}
+                />
+              </Animated.View>
             </View>
 
             <Text style={styles.xpSubtext}>
-              4,750 XP until <Text style={styles.xpBoldText}>next rank</Text>
+              {xpUntilNext.toLocaleString()} XP until <Text style={styles.xpBoldText}>next rank</Text>
             </Text>
           </View>
         </View>
@@ -958,13 +1014,22 @@ const styles = StyleSheet.create({
   },
   progressBarTrack: {
     height: 10,
-    backgroundColor: '#222226',
+    backgroundColor: '#1C1C20',
     borderRadius: 5,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressGradientFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 5,
   },
   xpSubtext: {

@@ -9,7 +9,7 @@ import { preloadTaskDoneSound } from '@/services/audio/taskDoneSound';
  */
 export async function preloadAppAssets(): Promise<void> {
   // Pre-warm done.wav audio buffer for ultra-snappy feedback
-  preloadTaskDoneSound().catch(() => {});
+  preloadTaskDoneSound().catch(() => { });
 
   const imageUrls = Object.values(CLOUDINARY_ASSETS)
     .map((asset) => asset.uri)

@@ -36,14 +36,36 @@ export type User = {
   completedDaysCount?: number;
   user_progression?: {
     id?: string;
+    user_id?: string;
     total_xp?: number;
     current_level?: number;
     daily_streak?: number;
     weekly_streak?: number;
     longest_streak?: number;
+    streak_multiplier?: number;
+    consecutive_miss_days?: number;
     last_active_date?: string;
+    streak_lives?: number;
+    updated_at?: string;
+    current_level_name?: string;
+    current_level_title?: string;
+    rank_name?: string;
+    rank?: string;
+    next_level_rank?: string;
+    next_level_rank_name?: string;
+    next_level_xp_required?: number;
+    next_level_required_xp?: number;
   };
   week_status?: WeekStatus;
+  badges?: Array<{
+    badge_id?: number;
+    name?: string;
+    description?: string;
+    image_url?: string | null;
+    badge_type?: string;
+    earned_at?: string;
+    milestone_days?: number;
+  }>;
 };
 
 export type AuthSession = {

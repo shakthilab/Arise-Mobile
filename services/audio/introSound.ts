@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 
 let globalIntroSound: Audio.Sound | null = null;
 let hapticTimers: any[] = [];
+let isPreloading = false;
 
 export function clearIntroHaptics(): void {
   hapticTimers.forEach((timer) => clearTimeout(timer));
@@ -37,43 +38,64 @@ export function triggerIntroHaptics(): void {
   });
 }
 
+/**
+ * Preload intro sound into memory for zero-delay instant playback
+ */
+export async function preloadIntroAudio(): Promise<void> {
+  if (globalIntroSound || isPreloading) return;
+  isPreloading = true;
+
+  try {
+    await Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    }).catch(() => {});
+
+    const { sound } = await Audio.Sound.createAsync(
+      require('@/assets/sounds/intro.mp3'),
+      { shouldPlay: false, volume: 1.0 }
+    );
+    globalIntroSound = sound;
+  } catch (err) {
+    console.log('Error preloading intro audio:', err);
+  } finally {
+    isPreloading = false;
+  }
+}
+
 export async function playIntroAudio(withHaptics: boolean = true): Promise<Audio.Sound | null> {
   const { soundEffectsEnabled, hapticsEnabled } = useSettingsStore.getState();
   if (!soundEffectsEnabled && !hapticsEnabled) return null;
 
   try {
-    if (globalIntroSound) {
-      const status = await globalIntroSound.getStatusAsync();
-      if (status.isLoaded && status.isPlaying) {
-        if (withHaptics && hapticsEnabled) triggerIntroHaptics();
-        return globalIntroSound;
-      }
-      await globalIntroSound.unloadAsync().catch(() => {});
-      globalIntroSound = null;
+    if (withHaptics && hapticsEnabled) {
+      triggerIntroHaptics();
     }
 
-    if (!soundEffectsEnabled) {
-      if (withHaptics && hapticsEnabled) triggerIntroHaptics();
-      return null;
+    if (!soundEffectsEnabled) return null;
+
+    if (globalIntroSound) {
+      const status = await globalIntroSound.getStatusAsync();
+      if (status.isLoaded) {
+        await globalIntroSound.setPositionAsync(0).catch(() => {});
+        await globalIntroSound.playAsync().catch(() => {});
+        return globalIntroSound;
+      }
     }
 
     await Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
-    });
+    }).catch(() => {});
 
     const { sound } = await Audio.Sound.createAsync(
-      { uri: CLOUDINARY_ASSETS.intro_audio.uri },
+      require('@/assets/sounds/intro.mp3'),
       { shouldPlay: true, volume: 1.0 }
     );
 
     globalIntroSound = sound;
-
-    // Trigger synchronized haptics at the exact moment playback starts
-    if (withHaptics) {
-      triggerIntroHaptics();
-    }
 
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.isLoaded && status.didJustFinish) {

@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useScrollToTop } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,6 +23,8 @@ import { fetchTasksToday, completeTask, reopenTask } from '@/services/api/tasks.
 import type { TaskItem } from '@/types/task';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getCurrentUser } from '@/services/api/auth.service';
+import { optimizeCloudinaryUrl } from '@/services/media/cloudinary';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Screen } from '@/components/common/Screen';
 import { ExactMedalIcon } from '@/components/common/ExactMedalIcon';
@@ -29,6 +32,7 @@ import { DayCompleteScreen } from '@/components/features/missions/DayCompleteScr
 import { LootDropModal } from '@/components/features/loot/LootDropModal';
 import { QuestActionModal } from '@/components/features/missions/QuestActionModal';
 import { TaskCompletedToast } from '@/components/features/missions/TaskCompletedToast';
+import { TaskCompletionBottomSheet } from '@/components/features/missions/TaskCompletionBottomSheet';
 import { WeeklyTracker } from '@/components/features/streaks/WeeklyTracker';
 import * as Haptics from 'expo-haptics';
 import { playTaskDoneSound } from '@/services/audio/taskDoneSound';
@@ -36,7 +40,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLootDrop } from '@/hooks/useLootDrop';
 import { fontFamilies } from '@/theme/typography';
 import { getAvatarSource } from './profile';
-import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import { useAvatarsReady } from '@/services/api/avatar.service';
 
 export interface QuestItem {
   id: string;
@@ -57,6 +61,16 @@ export interface QuestItem {
   allows_partial?: boolean;
 }
 
+const LAST_TASK_SHEET_DATE_KEY = '@hunterx_task_sheet_last_shown_date';
+
+function getTodayDateStr(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 const INITIAL_QUESTS: QuestItem[] = [
   {
     id: '1',
@@ -68,7 +82,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showWrongButton: true,
     hasStatusPopup: false,
     imageHeight: 120,
-    image: CLOUDINARY_ASSETS.sleep,
+    image: null,
     status: 'todo',
   },
   {
@@ -80,7 +94,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showTickButton: true,
     showWrongButton: true,
     hasStatusPopup: false,
-    image: CLOUDINARY_ASSETS.threelitterwater,
+    image: null,
     status: 'todo',
   },
   {
@@ -93,7 +107,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showWrongButton: true,
     hasStatusPopup: false,
     targetValue: '128 g',
-    image: CLOUDINARY_ASSETS.nutrition,
+    image: null,
     imageStyle: { height: 170, top: -25 },
     status: 'todo',
   },
@@ -106,7 +120,7 @@ const INITIAL_QUESTS: QuestItem[] = [
     showTickButton: true,
     showWrongButton: true,
     hasStatusPopup: false,
-    image: CLOUDINARY_ASSETS.run,
+    image: null,
     status: 'todo',
   },
 ];
@@ -117,19 +131,12 @@ const ANIME_AVATARS = [
 ];
 
 function mapTaskToQuest(item: TaskItem, type: 'daily' | 'weekly'): QuestItem {
-  let imageSource = CLOUDINARY_ASSETS.run;
   const tagUpper = item.tag?.toUpperCase() || '';
-  const titleUpper = item.title?.toUpperCase() || '';
 
-  if (tagUpper === 'REST' || titleUpper.includes('SLEEP')) {
-    imageSource = CLOUDINARY_ASSETS.sleep;
-  } else if (tagUpper === 'HYDRATE' || titleUpper.includes('WATER')) {
-    imageSource = CLOUDINARY_ASSETS.threelitterwater;
-  } else if (tagUpper === 'NUTRITION' || titleUpper.includes('PROTEIN')) {
-    imageSource = CLOUDINARY_ASSETS.nutrition;
-  }
-
-  const image = item.image_url ? { uri: item.image_url } : imageSource;
+  // Dynamically bind image from the API response, requesting a
+  // format/quality/size-optimized Cloudinary variant instead of the
+  // full-resolution original (see services/media/cloudinary.ts).
+  const image = item.image_url ? { uri: optimizeCloudinaryUrl(item.image_url) } : null;
 
   let status: 'todo' | 'done' | 'partial' | 'skipped' = 'todo';
   if (item.status === 'COMPLETED') {
@@ -175,6 +182,27 @@ function mapTaskToQuest(item: TaskItem, type: 'daily' | 'weekly'): QuestItem {
     imageHeight: tagUpper === 'REST' ? 120 : undefined,
     imageStyle: tagUpper === 'NUTRITION' ? { height: 170, top: -25 } : undefined,
   };
+}
+
+function QuestHeaderImage({ quest }: { quest: QuestItem }) {
+  if (quest.image) {
+    return (
+      <ExpoImage
+        source={quest.image}
+        style={[styles.questImage, quest.imageStyle, styles.questImageBg]}
+        cachePolicy="memory-disk"
+        transition={200}
+        contentFit="cover"
+        recyclingKey={quest.id}
+      />
+    );
+  }
+  return (
+    <LinearGradient
+      colors={['#1F1F24', '#0E0E11']}
+      style={styles.questImagePlaceholder}
+    />
+  );
 }
 
 function AnimatedTickButton({ onPress }: { onPress: () => void }) {
@@ -270,6 +298,10 @@ export default function MissionsHomeScreen() {
     }, [])
   );
 
+  // Re-renders once the avatar catalog loads so the header avatar reflects
+  // the user's actual avatar_id instead of the generic fallback image.
+  useAvatarsReady();
+
   const [dropVisible, setDropVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'todo' | 'done' | 'skipped'>('todo');
 
@@ -305,6 +337,10 @@ export default function MissionsHomeScreen() {
   const [errorToastVisible, setErrorToastVisible] = useState(false);
   const [errorToastTitle, setErrorToastTitle] = useState('Action Failed');
   const [errorToastSubtitle, setErrorToastSubtitle] = useState('');
+  const [taskBottomSheetVisible, setTaskBottomSheetVisible] = useState(false);
+  const [taskBottomSheetTitle, setTaskBottomSheetTitle] = useState('You started your proof of health streak!');
+  const [taskBottomSheetSubtitle, setTaskBottomSheetSubtitle] = useState<string | undefined>(undefined);
+  const [taskBottomSheetXp, setTaskBottomSheetXp] = useState(10);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -315,8 +351,19 @@ export default function MissionsHomeScreen() {
       ]);
       const mappedDaily = (tasksData.daily || []).map((item) => mapTaskToQuest(item, 'daily'));
       const mappedWeekly = (tasksData.weekly || []).map((item) => mapTaskToQuest(item, 'weekly'));
-      setQuests([...mappedDaily, ...mappedWeekly]);
+      const mapped = [...mappedDaily, ...mappedWeekly];
+      setQuests(mapped);
       useAuthStore.getState().setUser(refreshedUser);
+
+      // Warm the memory+disk cache for every quest image right away rather
+      // than waiting for each card to mount. Fire-and-forget: a failed
+      // prefetch just falls back to the normal on-demand load in the
+      // <ExpoImage> itself, so this never blocks the task list from showing.
+      mapped.forEach((quest) => {
+        if (quest.image?.uri) {
+          ExpoImage.prefetch(quest.image.uri, 'memory-disk').catch(() => {});
+        }
+      });
     } catch (err: any) {
       console.error('[LoadTasks Error]', err);
       setError(err?.message || 'Failed to load tasks');
@@ -358,51 +405,64 @@ export default function MissionsHomeScreen() {
     return undefined;
   };
 
+  const dailyQuests = quests.filter((q) => q.type === 'daily');
+  const weeklyQuests = quests.filter((q) => q.type === 'weekly');
+
   const todoQuests = quests.filter((q) => q.status === 'todo');
   const doneQuests = quests.filter((q) => q.status === 'done' || q.status === 'partial');
   const skippedQuests = quests.filter((q) => q.status === 'skipped');
 
   const dailyTodoQuests = todoQuests.filter((q) => q.type === 'daily');
   const weeklyTodoQuests = todoQuests.filter((q) => q.type === 'weekly');
+  const dailyDoneQuests = doneQuests.filter((q) => q.type === 'daily');
+  const weeklyDoneQuests = doneQuests.filter((q) => q.type === 'weekly');
+  const dailySkippedQuests = skippedQuests.filter((q) => q.type === 'daily');
+  const weeklySkippedQuests = skippedQuests.filter((q) => q.type === 'weekly');
 
-  // Automatically pop up DayCompleteScreen celebration when all tasks are completed
+  // Automatically pop up DayCompleteScreen celebration ONCE per day when all daily tasks are completed/skipped
   useEffect(() => {
-    if (todoQuests.length === 0 && quests.length > 0) {
-      const timer = setTimeout(() => {
-        setDayCompleteModalVisible(true);
-      }, 350);
-      return () => clearTimeout(timer);
+    if (loading) return;
+
+    if (dailyQuests.length > 0 && dailyTodoQuests.length === 0) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const storageKey = `hasShownDayComplete_${todayStr}`;
+
+      AsyncStorage.getItem(storageKey)
+        .then((hasShown) => {
+          if (!hasShown) {
+            AsyncStorage.setItem(storageKey, 'true').catch(() => {});
+            const timer = setTimeout(() => {
+              setDayCompleteModalVisible(true);
+            }, 350);
+            return () => clearTimeout(timer);
+          }
+        })
+        .catch((err) => {
+          console.warn('[DayCompleteModal] Storage check error:', err);
+        });
     }
-  }, [todoQuests.length, quests.length]);
+  }, [loading, dailyQuests.length, dailyTodoQuests.length]);
 
   const prevTodoCountRef = useRef<number | null>(null);
 
-  // Automatically switch tabs based on todoQuests count
+  // Automatically manage activeTab based on tasks
   useEffect(() => {
     if (!loading) {
       const prevCount = prevTodoCountRef.current;
       const currentCount = todoQuests.length;
-      
-      // 1. Initial load completed
+
+      // On initial load, default to 'todo' tab so user can see To-Do tab and Daily Quests Cleared banner
       if (prevCount === null) {
-        if (currentCount === 0 && quests.length > 0) {
-          setActiveTab('done');
-        } else {
-          setActiveTab('todo');
-        }
-      } 
-      // 2. Action occurred: all tasks completed
-      else if (currentCount === 0 && prevCount > 0 && quests.length > 0) {
-        setActiveTab('done');
+        setActiveTab('todo');
       }
-      // 3. Action occurred: task reopened/added back to todo
+      // Action occurred: task reopened/added back to todo
       else if (currentCount > 0 && prevCount === 0) {
         setActiveTab('todo');
       }
-      
+
       prevTodoCountRef.current = currentCount;
     }
-  }, [todoQuests.length, quests.length, loading]);
+  }, [loading, todoQuests.length, quests.length]);
 
   const handleCompleteTask = useCallback(async (
     questId: string,
@@ -440,7 +500,23 @@ export default function MissionsHomeScreen() {
         isPartial ? 'Progress logged · Half XP earned!' : 'Great job, hunter!'
       );
       setToastXp(optimisticEarnedXp);
-      setCompletedToastVisible(true);
+
+      // Check if this is the FIRST task completed of the day
+      const isFirstTaskOfToday = doneQuests.length === 0;
+
+      if (isFirstTaskOfToday) {
+        // Show celebration bottom sheet ONLY on the first task of the day
+        setTaskBottomSheetTitle(`Quest Cleared: ${targetQuest.title}`);
+        setTaskBottomSheetSubtitle(
+          'One day down. The flame grows stronger with each rise.'
+        );
+        setTaskBottomSheetXp(optimisticEarnedXp);
+        setTaskBottomSheetVisible(true);
+      } else {
+        // Subsequent tasks completed on the same day show top toast instead
+        setCompletedToastVisible(true);
+      }
+
       playTaskDoneSound(isPartial ? 'partial' : 'completed');
     } else {
       setCompletedToastVisible(false);
@@ -560,7 +636,7 @@ export default function MissionsHomeScreen() {
         <View style={styles.topHeader}>
           <View style={styles.userProfileGroup}>
             <View style={styles.avatarWrapper}>
-              <Image source={getAvatarSource(user?.avatarUrl)} style={styles.avatarImage} />
+              <Image source={getAvatarSource(user?.avatarUrl, (user as any)?.avatar_id)} style={styles.avatarImage} />
               <View style={styles.levelBadgeCircle}>
                 <Text style={styles.levelBadgeText}>{displayLevel}</Text>
               </View>
@@ -595,6 +671,8 @@ export default function MissionsHomeScreen() {
           streakDays={displayStreak}
           completedDaysCount={completedDays}
           avatarUrl={user?.avatarUrl}
+          avatarId={(user as any)?.avatar_id}
+          userBadges={user?.badges}
         />
 
         {/* FILTER TABS ROW */}
@@ -725,84 +803,84 @@ export default function MissionsHomeScreen() {
                       There are no tasks assigned to you for today.
                     </Text>
                   </View>
-                ) : todoQuests.length === 0 ? (
-              <LinearGradient
-                colors={['#18181B', '#0E0E10']}
-                style={styles.peakReachedCard}
-              >
-                <View style={styles.peakReachedLeftCol}>
-                  <View style={styles.peakHeaderRow}>
-                    <Ionicons name="trophy" size={18} color="#E5A93C" style={{ marginRight: 6 }} />
-                    <Text style={styles.peakReachedSubtag}>PEAK REACHED</Text>
-                  </View>
-                  <Text style={styles.peakReachedTitle}>Daily Quests Cleared!</Text>
-                  <Text style={styles.peakReachedSubtext}>
-                    All objectives successfully resolved for today. Arise, Hunter.
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.peakShareBtn}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setDayCompleteModalVisible(true);
-                  }}
-                >
-                  <Text style={styles.peakShareBtnText}>CELEBRATE</Text>
-                  <Ionicons name="sparkles" size={14} color="#0A0A0A" />
-                </TouchableOpacity>
-              </LinearGradient>
-            ) : (
-              <>
-                {/* ROUTINE QUESTS Section */}
-                {dailyTodoQuests.length > 0 && (
+                ) : (
                   <>
-                    <Text style={styles.sectionMonoLabel}>ROUTINE QUESTS</Text>
-                    {dailyTodoQuests.map((quest) => (
-                      <View key={quest.id} style={styles.questCard}>
-                        <View style={styles.questImageWrapper}>
-                          <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
-
-                          <View style={styles.topRightActionsCol}>
-                            <View style={styles.xpBadgeInline}>
-                              <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
-                            </View>
-
-                            {quest.showTickButton !== false && (
-                              <AnimatedTickButton onPress={() => handleOpenQuestActions(quest)} />
-                            )}
-
-                            {quest.showWrongButton !== false && (
-                              <AnimatedWrongButton onPress={() => handleDirectSkip(quest.id)} />
-                            )}
+                    {/* DAILY QUESTS Section or PEAK REACHED Banner */}
+                    {dailyQuests.length > 0 && dailyTodoQuests.length === 0 ? (
+                      <LinearGradient
+                        colors={['#18181B', '#0E0E10']}
+                        style={styles.peakReachedCard}
+                      >
+                        <View style={styles.peakReachedLeftCol}>
+                          <View style={styles.peakHeaderRow}>
+                            <Ionicons name="trophy" size={18} color="#E5A93C" style={{ marginRight: 6 }} />
+                            <Text style={styles.peakReachedSubtag}>PEAK REACHED</Text>
                           </View>
+                          <Text style={styles.peakReachedTitle}>Daily Quests Cleared!</Text>
+                          <Text style={styles.peakReachedSubtext}>
+                            All objectives successfully resolved for today. Arise, Hunter.
+                          </Text>
                         </View>
 
-                        <View style={styles.questBody}>
-                          <View style={styles.questTitleCol}>
-                            <View style={styles.categoryRow}>
-                              <View style={styles.categoryPill}>
-                                <Text style={styles.categoryPillText}>{quest.category}</Text>
-                              </View>
-                              <View style={styles.routineBadgeInline}>
-                                <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                                <Text style={styles.routineBadgeText}>Routine</Text>
-                              </View>
-                            </View>
-                            <Text style={styles.questTitle}>{quest.title}</Text>
-                          </View>
+                        <TouchableOpacity
+                          style={styles.peakShareBtn}
+                          activeOpacity={0.85}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setDayCompleteModalVisible(true);
+                          }}
+                        >
+                          <Text style={styles.peakShareBtnText}>CELEBRATE</Text>
+                          <Ionicons name="sparkles" size={14} color="#0A0A0A" />
+                        </TouchableOpacity>
+                      </LinearGradient>
+                    ) : dailyTodoQuests.length > 0 ? (
+                      <>
+                        <Text style={styles.sectionMonoLabel}>DAILY QUESTS</Text>
+                        {dailyTodoQuests.map((quest) => (
+                          <View key={quest.id} style={styles.questCard}>
+                            <View style={styles.questImageWrapper}>
+                              <QuestHeaderImage quest={quest} />
 
-                          {getQuestTargetValue(quest) && (
-                            <View style={styles.targetValueBox}>
-                              <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
+                              <View style={styles.topRightActionsCol}>
+                                <View style={styles.xpBadgeInline}>
+                                  <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
+                                </View>
+
+                                {quest.showTickButton !== false && (
+                                  <AnimatedTickButton onPress={() => handleOpenQuestActions(quest)} />
+                                )}
+
+                                {quest.showWrongButton !== false && (
+                                  <AnimatedWrongButton onPress={() => handleDirectSkip(quest.id)} />
+                                )}
+                              </View>
                             </View>
-                          )}
-                        </View>
-                      </View>
-                    ))}
-                  </>
-                )}
+
+                            <View style={styles.questBody}>
+                              <View style={styles.questTitleCol}>
+                                <View style={styles.categoryRow}>
+                                  <View style={styles.categoryPill}>
+                                    <Text style={styles.categoryPillText}>{quest.category}</Text>
+                                  </View>
+                                  <View style={styles.routineBadgeInline}>
+                                    <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                                    <Text style={styles.routineBadgeText}>Routine</Text>
+                                  </View>
+                                </View>
+                                <Text style={styles.questTitle}>{quest.title}</Text>
+                              </View>
+
+                              {getQuestTargetValue(quest) && (
+                                <View style={styles.targetValueBox}>
+                                  <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        ))}
+                      </>
+                    ) : null}
 
                 {/* WEEKLY QUESTS Section */}
                 {weeklyTodoQuests.length > 0 && (
@@ -811,7 +889,7 @@ export default function MissionsHomeScreen() {
                     {weeklyTodoQuests.map((quest) => (
                       <View key={quest.id} style={styles.questCard}>
                         <View style={styles.questImageWrapper}>
-                          <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
+                          <QuestHeaderImage quest={quest} />
 
                           <View style={styles.topRightActionsCol}>
                             <View style={styles.xpBadgeInline}>
@@ -869,40 +947,89 @@ export default function MissionsHomeScreen() {
                 </Text>
               </View>
             ) : (
-              doneQuests.map((quest) => (
-                <View key={quest.id} style={styles.questCard}>
-                  <View style={styles.questImageWrapper}>
-                    <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
+              <>
+                {/* DAILY QUESTS Section */}
+                {dailyDoneQuests.length > 0 && (
+                  <>
+                    <Text style={styles.sectionMonoLabel}>DAILY QUESTS</Text>
+                    {dailyDoneQuests.map((quest) => (
+                      <View key={quest.id} style={styles.questCard}>
+                        <View style={styles.questImageWrapper}>
+                          <QuestHeaderImage quest={quest} />
 
-                    <View style={styles.topRightActionsCol}>
-                      <View style={styles.xpBadgeInline}>
-                        <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.questBody}>
-                    <View style={styles.questTitleCol}>
-                      <View style={styles.categoryRow}>
-                        <View style={styles.categoryPill}>
-                          <Text style={styles.categoryPillText}>{quest.category}</Text>
+                          <View style={styles.topRightActionsCol}>
+                            <View style={styles.xpBadgeInline}>
+                              <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
+                            </View>
+                          </View>
                         </View>
-                        <View style={styles.routineBadgeInline}>
-                          <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                          <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
+
+                        <View style={styles.questBody}>
+                          <View style={styles.questTitleCol}>
+                            <View style={styles.categoryRow}>
+                              <View style={styles.categoryPill}>
+                                <Text style={styles.categoryPillText}>{quest.category}</Text>
+                              </View>
+                              <View style={styles.routineBadgeInline}>
+                                <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                                <Text style={styles.routineBadgeText}>Routine</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.questTitle}>{quest.title}</Text>
+                          </View>
+
+                          {getQuestTargetValue(quest) && (
+                            <View style={styles.targetValueBox}>
+                              <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
+                            </View>
+                          )}
                         </View>
                       </View>
-                      <Text style={styles.questTitle}>{quest.title}</Text>
-                    </View>
+                    ))}
+                  </>
+                )}
 
-                    {getQuestTargetValue(quest) && (
-                      <View style={styles.targetValueBox}>
-                        <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
+                {/* WEEKLY QUESTS Section */}
+                {weeklyDoneQuests.length > 0 && (
+                  <>
+                    <Text style={[styles.sectionMonoLabel, { marginTop: dailyDoneQuests.length > 0 ? 24 : 0 }]}>WEEKLY QUESTS</Text>
+                    {weeklyDoneQuests.map((quest) => (
+                      <View key={quest.id} style={styles.questCard}>
+                        <View style={styles.questImageWrapper}>
+                          <QuestHeaderImage quest={quest} />
+
+                          <View style={styles.topRightActionsCol}>
+                            <View style={styles.xpBadgeInline}>
+                              <Text style={styles.xpBadgeText}>+{quest.xpReward} XP</Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        <View style={styles.questBody}>
+                          <View style={styles.questTitleCol}>
+                            <View style={styles.categoryRow}>
+                              <View style={styles.categoryPill}>
+                                <Text style={styles.categoryPillText}>{quest.category}</Text>
+                              </View>
+                              <View style={styles.routineBadgeInline}>
+                                <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                                <Text style={styles.routineBadgeText}>Weekly</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.questTitle}>{quest.title}</Text>
+                          </View>
+
+                          {getQuestTargetValue(quest) && (
+                            <View style={styles.targetValueBox}>
+                              <Text style={styles.targetValueText}>{getQuestTargetValue(quest)}</Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    )}
-                  </View>
-                </View>
-              ))
+                    ))}
+                  </>
+                )}
+              </>
             )}
           </>
         )}
@@ -919,41 +1046,91 @@ export default function MissionsHomeScreen() {
                 </Text>
               </View>
             ) : (
-              skippedQuests.map((quest) => (
-                <View key={quest.id} style={[styles.questCard, { opacity: 0.55 }]}>
-                  <View style={styles.questImageWrapper}>
-                    <Image source={quest.image} style={[styles.questImage, quest.imageStyle]} />
+              <>
+                {/* DAILY QUESTS Section */}
+                {dailySkippedQuests.length > 0 && (
+                  <>
+                    <Text style={styles.sectionMonoLabel}>DAILY QUESTS</Text>
+                    {dailySkippedQuests.map((quest) => (
+                      <View key={quest.id} style={[styles.questCard, { opacity: 0.55 }]}>
+                        <View style={styles.questImageWrapper}>
+                          <QuestHeaderImage quest={quest} />
 
-                    <View style={[styles.xpBadgeTopRight, styles.skippedBadgeContainer]}>
-                      <Ionicons name="play-skip-forward" size={14} color="#A1A1AA" />
-                      <Text style={[styles.xpBadgeText, { color: '#A1A1AA' }]}>SKIPPED</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.questBody}>
-                    <View style={styles.questTitleCol}>
-                      <View style={styles.categoryRow}>
-                        <View style={styles.categoryPill}>
-                          <Text style={styles.categoryPillText}>{quest.category}</Text>
+                          <View style={[styles.xpBadgeTopRight, styles.skippedBadgeContainer]}>
+                            <Ionicons name="play-skip-forward" size={14} color="#A1A1AA" />
+                            <Text style={[styles.xpBadgeText, { color: '#A1A1AA' }]}>SKIPPED</Text>
+                          </View>
                         </View>
-                        <View style={styles.routineBadgeInline}>
-                          <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
-                          <Text style={styles.routineBadgeText}>{quest.type === 'daily' ? 'Routine' : 'Weekly'}</Text>
+
+                        <View style={styles.questBody}>
+                          <View style={styles.questTitleCol}>
+                            <View style={styles.categoryRow}>
+                              <View style={styles.categoryPill}>
+                                <Text style={styles.categoryPillText}>{quest.category}</Text>
+                              </View>
+                              <View style={styles.routineBadgeInline}>
+                                <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                                <Text style={styles.routineBadgeText}>Routine</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.questTitle}>{quest.title}</Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.undoButton}
+                            onPress={() => handleResetQuest(quest.id)}
+                          >
+                            <Ionicons name="refresh-outline" size={16} color="#A1A1AA" />
+                            <Text style={styles.undoButtonText}>Reset</Text>
+                          </TouchableOpacity>
                         </View>
                       </View>
-                      <Text style={styles.questTitle}>{quest.title}</Text>
-                    </View>
+                    ))}
+                  </>
+                )}
 
-                    <TouchableOpacity
-                      style={styles.undoButton}
-                      onPress={() => handleResetQuest(quest.id)}
-                    >
-                      <Ionicons name="refresh-outline" size={16} color="#A1A1AA" />
-                      <Text style={styles.undoButtonText}>Reset</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
+                {/* WEEKLY QUESTS Section */}
+                {weeklySkippedQuests.length > 0 && (
+                  <>
+                    <Text style={[styles.sectionMonoLabel, { marginTop: dailySkippedQuests.length > 0 ? 24 : 0 }]}>WEEKLY QUESTS</Text>
+                    {weeklySkippedQuests.map((quest) => (
+                      <View key={quest.id} style={[styles.questCard, { opacity: 0.55 }]}>
+                        <View style={styles.questImageWrapper}>
+                          <QuestHeaderImage quest={quest} />
+
+                          <View style={[styles.xpBadgeTopRight, styles.skippedBadgeContainer]}>
+                            <Ionicons name="play-skip-forward" size={14} color="#A1A1AA" />
+                            <Text style={[styles.xpBadgeText, { color: '#A1A1AA' }]}>SKIPPED</Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.questBody}>
+                          <View style={styles.questTitleCol}>
+                            <View style={styles.categoryRow}>
+                              <View style={styles.categoryPill}>
+                                <Text style={styles.categoryPillText}>{quest.category}</Text>
+                              </View>
+                              <View style={styles.routineBadgeInline}>
+                                <Ionicons name="repeat-outline" size={12} color="#A1A1AA" />
+                                <Text style={styles.routineBadgeText}>Weekly</Text>
+                              </View>
+                            </View>
+                            <Text style={styles.questTitle}>{quest.title}</Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.undoButton}
+                            onPress={() => handleResetQuest(quest.id)}
+                          >
+                            <Ionicons name="refresh-outline" size={16} color="#A1A1AA" />
+                            <Text style={styles.undoButtonText}>Reset</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </>
+                )}
+              </>
             )}
           </>
         )}
@@ -1008,6 +1185,18 @@ export default function MissionsHomeScreen() {
         subtitle={errorToastSubtitle}
         isError={true}
         onDismiss={() => setErrorToastVisible(false)}
+      />
+
+      {/* Task Completion Celebration Bottom Sheet Modal */}
+      <TaskCompletionBottomSheet
+        visible={taskBottomSheetVisible}
+        title={taskBottomSheetTitle}
+        subtitle={taskBottomSheetSubtitle}
+        streakDays={displayStreak}
+        xp={taskBottomSheetXp}
+        weekStatus={user?.week_status}
+        onClose={() => setTaskBottomSheetVisible(false)}
+        onContinue={() => setTaskBottomSheetVisible(false)}
       />
 
       {/* Day Complete Modal Popup */}
@@ -1406,6 +1595,15 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  // Solid ground shown behind the image while it loads/decodes, so the
+  // card never flashes empty/transparent before the fade-in transition.
+  questImageBg: {
+    backgroundColor: '#1A1A1F',
+  },
+  questImagePlaceholder: {
+    width: '100%',
+    height: '100%',
   },
   topRightActionsCol: {
     position: 'absolute',

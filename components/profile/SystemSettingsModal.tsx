@@ -16,6 +16,7 @@ import { GoogleIcon } from '@/components/common/GoogleIcon';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { getCurrentUser, updateUserEmail } from '@/services/api/auth.service';
+import { exportUserData } from '@/services/api/user.service';
 import {
   getUserSettings,
   updateUserSettings,
@@ -23,6 +24,8 @@ import {
 } from '@/services/api/settings.service';
 import { useSettingsContext } from '@/context/SettingsContext';
 import { HunterSwitch } from './HunterSwitch';
+import { HunterToast, type HunterToastType } from '@/components/common/HunterToast';
+import { showGlobalToast } from '@/store/useToastStore';
 
 export interface SystemSettingsModalProps {
   visible: boolean;
@@ -97,6 +100,17 @@ export function SystemSettingsModal({
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
   const [newEmailInput, setNewEmailInput] = useState('');
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: HunterToastType }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
+
+  const showToast = (message: string, type: HunterToastType = 'success') => {
+    setToast({ visible: true, message, type });
+    showGlobalToast(message, type);
+  };
 
   // Fetch account-level settings on modal mount
   useEffect(() => {
@@ -223,14 +237,23 @@ export function SystemSettingsModal({
     }
   };
 
-  const handleDownloadData = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    Alert.alert(
-      'Data Export Requested',
-      'We are preparing an archive of your HunterX workouts, quests, and account history. A download link will be emailed to ' +
-        (user?.email || 'your registered email') +
-        ' within 24 hours.'
-    );
+  const handleDownloadData = async () => {
+    if (isExportingData) return;
+    setIsExportingData(true);
+    try {
+      const res = await exportUserData();
+      showToast(
+        res.message || 'Your data export has been sent to your registered email address.',
+        'success'
+      );
+    } catch (err: any) {
+      showToast(
+        err.message || 'Unable to request data export. Please try again later.',
+        'error'
+      );
+    } finally {
+      setIsExportingData(false);
+    }
   };
 
   const allOn = accountSettings.notify_all;
@@ -702,11 +725,16 @@ export function SystemSettingsModal({
             <TouchableOpacity
               style={styles.settingRow}
               onPress={handleDownloadData}
+              disabled={isExportingData}
               activeOpacity={0.7}
             >
               <View style={styles.settingLeftGroup}>
                 <View style={styles.settingIconBox}>
-                  <Ionicons name="cloud-download-outline" size={18} color="#FE5B01" />
+                  {isExportingData ? (
+                    <ActivityIndicator size="small" color="#FE5B01" />
+                  ) : (
+                    <Ionicons name="cloud-download-outline" size={18} color="#FE5B01" />
+                  )}
                 </View>
                 <View style={styles.settingTextGroup}>
                   <Text style={styles.settingTitle}>Download My Data</Text>
@@ -715,7 +743,11 @@ export function SystemSettingsModal({
                   </Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#71717A" />
+              {isExportingData ? (
+                <ActivityIndicator size="small" color="#71717A" />
+              ) : (
+                <Ionicons name="chevron-forward" size={16} color="#71717A" />
+              )}
             </TouchableOpacity>
           </View>
 
@@ -817,6 +849,13 @@ export function SystemSettingsModal({
             </View>
           </View>
         </Modal>
+        {/* Toast Notification */}
+        <HunterToast
+          visible={toast.visible}
+          message={toast.message}
+          type={toast.type}
+          onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+        />
       </Screen>
     </Modal>
   );

@@ -21,6 +21,7 @@ import { colors } from '@/theme/colors';
 import { useAuthStore } from '@/store/useAuthStore';
 import { GlobalToast } from '@/components/common/GlobalToast';
 import { preloadAppAssets } from '@/services/media/preloadAssets';
+import { getAvatars } from '@/services/api/avatar.service';
 
 import { SettingsProvider } from '@/context/SettingsContext';
 
@@ -97,6 +98,9 @@ export default function RootLayout() {
   useEffect(() => {
     useAuthStore.getState().restoreSession();
     preloadAppAssets();
+    // Warms the avatar catalog cache so the user's actual avatar_id resolves
+    // to its image on first paint instead of falling back to a generic avatar.
+    getAvatars().catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -8,6 +8,7 @@ import { getAvatarSource } from '@/app/(tabs)/profile';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
 import type { WeekStatus } from '@/types/user';
 import { WeeklyProgressCard } from './WeeklyProgressCard';
+import { StreakBadgesCarousel } from './StreakBadgesCarousel';
 
 export type DayStatus = 'completed' | 'today' | 'missed' | 'locked' | 'freeze';
 
@@ -30,6 +31,8 @@ interface WeeklyTrackerProps {
   subtitleMessage?: string;
   characterImageSource?: any;
   avatarUrl?: string | null;
+  avatarId?: string | number | null;
+  userBadges?: any[];
   showBottomCard?: boolean;
   onDayPress?: (day: DayTrackerItem) => void;
 }
@@ -230,6 +233,8 @@ export function WeeklyTracker({
   subtitleMessage = 'Track your progress. Consistency builds legends.',
   characterImageSource = DEFAULT_CHARACTER_IMAGE,
   avatarUrl,
+  avatarId,
+  userBadges,
   showBottomCard = false,
   onDayPress,
 }: WeeklyTrackerProps) {
@@ -424,8 +429,12 @@ export function WeeklyTracker({
           totalDaysCount={totalDaysCount}
           characterImageSource={characterImageSource}
           avatarUrl={avatarUrl}
+          avatarId={avatarId}
         />
       )}
+
+      {/* STREAK BADGES CAROUSEL (7 BADGES, 4 IN VIEW RESPONSIVE) */}
+      <StreakBadgesCarousel currentStreak={streakDays} userBadges={userBadges} />
 
       {/* 
       BOTTOM CARD SECTION (Preserved as commented-out code)
@@ -619,7 +628,7 @@ const styles = StyleSheet.create({
   /* DAYS ROW & MOVING TIMELINE PATH */
   daysRowContainer: {
     position: 'relative',
-    marginBottom: 24,
+    marginBottom: 8,
   },
   timelineLineBackground: {
     position: 'absolute',

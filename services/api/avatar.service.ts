@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { ApiResponse } from '@/types/api';
 import { apiClient } from './client';
 
@@ -12,6 +13,17 @@ export interface AvatarItem {
 
 let cachedAvatars: AvatarItem[] | null = null;
 let fetchPromise: Promise<AvatarItem[]> | null = null;
+
+// Lets components (e.g. the Profile/Home avatar) re-render once the avatar
+// catalog finishes loading, so `getAvatarSource` can resolve the real image
+// for a user's avatar_id instead of being stuck on the generic fallback that
+// it returns while `cachedAvatars` is still empty.
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+function notifyAvatarsReady() {
+  listeners.forEach((listener) => listener());
+}
 
 export async function getAvatars(): Promise<AvatarItem[]> {
   if (cachedAvatars && cachedAvatars.length > 0) {
@@ -59,6 +71,7 @@ export async function getAvatars(): Promise<AvatarItem[]> {
       }
     } finally {
       fetchPromise = null;
+      notifyAvatarsReady();
     }
     return cachedAvatars || [];
   })();
@@ -68,4 +81,31 @@ export async function getAvatars(): Promise<AvatarItem[]> {
 
 export function getCachedAvatars(): AvatarItem[] | null {
   return cachedAvatars;
+}
+
+/**
+ * Forces a re-render once the avatar catalog has loaded. Mount this in any
+ * screen that renders the current user's avatar via `getAvatarSource` so it
+ * doesn't get stuck showing the generic fallback image while
+ * `cachedAvatars` is still empty (e.g. on a cold app start).
+ */
+export function useAvatarsReady(): boolean {
+  const [ready, setReady] = useState(!!cachedAvatars);
+
+  useEffect(() => {
+    if (cachedAvatars) {
+      setReady(true);
+      return;
+    }
+
+    const listener = () => setReady(!!cachedAvatars);
+    listeners.add(listener);
+    getAvatars().catch(() => {});
+
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+
+  return ready;
 }

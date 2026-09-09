@@ -19,6 +19,7 @@ import { HunterToast } from '@/components/common/HunterToast';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { AvatarSelectionModal, getAvatarSource } from './AvatarSelectionModal';
+import { useAvatarsReady } from '@/services/api/avatar.service';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -86,6 +87,10 @@ export function EditProfileModal({
   onOpenAvatarPicker,
   onDeleteAccount,
 }: EditProfileModalProps) {
+  // Re-renders once the avatar catalog loads so the header preview reflects
+  // the user's actual avatar_id instead of the generic fallback image.
+  useAvatarsReady();
+
   const [profileForm, setProfileForm] = useState<EditProfileFormData>({
     name: 'Shadow Hunter',
     gender: 'Male',

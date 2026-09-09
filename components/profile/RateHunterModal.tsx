@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Image,
-  Linking,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -17,9 +18,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as StoreReview from 'expo-store-review';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import { submitRating } from '@/services/api/rating.service';
+import { showGlobalToast } from '@/store/useToastStore';
+
+const HAS_SHOWN_STORE_REVIEW_KEY = 'hasShownStoreReviewPrompt';
+const STORE_REVIEW_PROMPT_DELAY_MS = 800;
+
+/**
+ * Requests the native App Store / Play Store review prompt.
+ *
+ * Must run only after the calling modal has fully finished dismissing —
+ * iOS's SKStoreReviewController (and Android's in-app review sheet) will
+ * silently no-op if it's called while another native view transition
+ * (e.g. this screen's own Modal closing) is still in flight.
+ */
+async function requestNativeStoreReview() {
+  try {
+    const hasShownLocally = await AsyncStorage.getItem(HAS_SHOWN_STORE_REVIEW_KEY);
+    if (hasShownLocally) return;
+
+    const isAvailable = await StoreReview.isAvailableAsync();
+    if (!isAvailable) return;
+
+    await StoreReview.requestReview();
+    // Only remember "shown" once we actually got through requestReview()
+    // without error — otherwise a failed/unavailable attempt would
+    // permanently block all future attempts on this device.
+    await AsyncStorage.setItem(HAS_SHOWN_STORE_REVIEW_KEY, 'true').catch(() => {});
+  } catch (err) {
+    console.warn('[RateHunterModal] StoreReview error:', err);
+  }
+}
 
 const PREDEFINED_REVIEWS: Record<number, string> = {
   1: 'Encountered bugs and performance issues. Needs significant improvement.',
@@ -35,9 +68,11 @@ export interface RateHunterModalProps {
 }
 
 export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
+  const scrollRef = useRef<ScrollView>(null);
   const [selectedRating, setSelectedRating] = useState<number>(5);
   const [rateFeedbackText, setRateFeedbackText] = useState(PREDEFINED_REVIEWS[5]);
   const [rateCategory, setRateCategory] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // UI Entry Slide Animation (Card & text slide up from down after initial image load)
   const bottomSectionSlideAnim = useRef(new Animated.Value(320)).current;
@@ -89,34 +124,35 @@ export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
   };
 
   const handleSubmit = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    onClose();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    if (selectedRating >= 3) {
-      try {
-        const isAvailable = await StoreReview.isAvailableAsync();
-        if (isAvailable) {
-          await StoreReview.requestReview();
-        } else {
-          const storeUrl =
-            Platform.OS === 'ios'
-              ? 'https://apps.apple.com/app/hunterx'
-              : 'https://play.google.com/store/apps/details?id=com.hunterx.app';
-          Linking.openURL(storeUrl).catch(() => {});
-        }
-      } catch (err) {
-        console.log('Error opening native store review popup:', err);
-        const storeUrl =
-          Platform.OS === 'ios'
-            ? 'https://apps.apple.com/app/hunterx'
-            : 'https://play.google.com/store/apps/details?id=com.hunterx.app';
-        Linking.openURL(storeUrl).catch(() => {});
+    try {
+      const res = await submitRating({
+        rating: selectedRating,
+        feedback: rateFeedbackText.trim(),
+        category: rateCategory,
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onClose();
+
+      const confirmationMsg = res?.message || 'Thanks for your feedback, Hunter';
+      showGlobalToast(confirmationMsg, 'success');
+
+      if (res?.promptStoreReview) {
+        // Wait for this Modal's dismiss transition to fully settle before
+        // presenting the native review sheet — requesting it too early
+        // (while the modal is still animating away) gets silently dropped.
+        setTimeout(() => {
+          requestNativeStoreReview();
+        }, STORE_REVIEW_PROMPT_DELAY_MS);
       }
-    } else {
-      Alert.alert(
-        'Feedback Received',
-        'Thank you! Your feedback has been sent directly to the hunter development team.'
-      );
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Alert.alert('Submission Failed', err.message || 'Unable to submit rating. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -149,10 +185,16 @@ export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
           />
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.rateScrollContent}
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={styles.rateScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
           {/* Top Area: Floating Back Button */}
           <Animated.View style={[styles.rateTopArea, { opacity: backBtnOpacityAnim }]}>
             <View style={styles.rateHeaderTopBar}>
@@ -161,7 +203,7 @@ export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
                 onPress={onClose}
                 activeOpacity={0.75}
               >
-                <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+                <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -251,7 +293,7 @@ export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
                   </Text>
 
                   <View style={styles.feedbackCategoriesRow}>
-                    {['Quests & XP', 'UI & Design', 'Performance', 'Workout Tracker', 'Other'].map(
+                    {['Quests & XP', 'UI & Design', 'Performance', 'Notifications', 'Other'].map(
                       (cat) => {
                         const isCatSelected = rateCategory === cat;
                         return (
@@ -286,11 +328,17 @@ export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
                     onChangeText={setRateFeedbackText}
                     multiline
                     numberOfLines={3}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        scrollRef.current?.scrollToEnd({ animated: true });
+                      }, 150);
+                    }}
                   />
 
                   <TouchableOpacity
                     style={styles.ratePrimaryBtn}
                     onPress={handleSubmit}
+                    disabled={isSubmitting}
                     activeOpacity={0.85}
                   >
                     <LinearGradient
@@ -299,15 +347,21 @@ export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
                       end={{ x: 1, y: 0 }}
                       style={styles.ratePrimaryGradient}
                     >
-                      <Ionicons
-                        name={selectedRating >= 3 ? 'star' : 'send'}
-                        size={16}
-                        color="#09090B"
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text style={styles.ratePrimaryBtnText}>
-                        {selectedRating >= 3 ? 'Submit Review ✨' : 'Submit Direct Feedback'}
-                      </Text>
+                      {isSubmitting ? (
+                        <ActivityIndicator size="small" color="#09090B" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name={selectedRating >= 3 ? 'star' : 'send'}
+                            size={16}
+                            color="#09090B"
+                            style={{ marginRight: 8 }}
+                          />
+                          <Text style={styles.ratePrimaryBtnText}>
+                            {selectedRating >= 3 ? 'Submit Review ✨' : 'Submit Direct Feedback'}
+                          </Text>
+                        </>
+                      )}
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
@@ -320,7 +374,8 @@ export function RateHunterModal({ visible, onClose }: RateHunterModalProps) {
               </View>
             </View>
           </Animated.View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Screen>
     </Modal>
   );
@@ -355,12 +410,8 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   rateFloatingBackBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(20, 20, 24, 0.85)',
-    borderWidth: 1,
-    borderColor: '#2E2E38',
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
   },

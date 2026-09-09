@@ -75,3 +75,40 @@ export async function fetchUserActivity(page = 1, limit = 10): Promise<UserActiv
     throw new Error(extractErrorMessage(err));
   }
 }
+
+export interface DataExportResponse {
+  message?: string;
+  downloadUrl?: string;
+  download_url?: string;
+}
+
+export async function exportUserData(): Promise<{ message: string; downloadUrl?: string }> {
+  try {
+    const { data } = await apiClient.post<ApiResponse<DataExportResponse>>('/users/me/data-export');
+    if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+      throw new Error((data as any).error?.message || (data as any).message || 'Failed to request data export');
+    }
+    const result = (data as any)?.data || data;
+    const message = result?.message || 'Data export requested successfully.';
+    const downloadUrl = result?.downloadUrl || result?.download_url;
+    return { message, downloadUrl };
+  } catch (err: any) {
+    const isNotFound = err?.response?.status === 404 || (err?.message && err.message.includes('404'));
+    if (isNotFound) {
+      try {
+        const { data } = await apiClient.post<ApiResponse<DataExportResponse>>('/api/users/me/data-export');
+        if (data && typeof data === 'object' && 'success' in data && data.success === false) {
+          throw new Error((data as any).error?.message || (data as any).message || 'Failed to request data export');
+        }
+        const result = (data as any)?.data || data;
+        const message = result?.message || 'Data export requested successfully.';
+        const downloadUrl = result?.downloadUrl || result?.download_url;
+        return { message, downloadUrl };
+      } catch (innerErr: any) {
+        throw new Error(extractErrorMessage(innerErr));
+      }
+    }
+    throw new Error(extractErrorMessage(err));
+  }
+}
+

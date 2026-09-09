@@ -18,7 +18,8 @@
       "bundleIdentifier": "com.hunterx.mobile",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow HunterX to access your photos to attach screenshots to your feedback."
       }
     },
     "android": {
@@ -49,6 +50,12 @@
       "expo-audio",
       "expo-font",
       "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow HunterX to access your photos to attach screenshots to your feedback."
+        }
+      ],
       [
         "@react-native-google-signin/google-signin",
         {

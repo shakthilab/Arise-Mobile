@@ -48,7 +48,7 @@ export function InviteFriendsModal({
     const startScanAnimation = () => {
       scanAnim.setValue(0);
       animation = Animated.timing(scanAnim, {
-        toValue: 120,
+        toValue: 135,
         duration: 3400,
         useNativeDriver: true,
       });
@@ -228,6 +228,21 @@ export function InviteFriendsModal({
                   <View style={styles.guestPassCenterTextGroup}>
                     <Text style={styles.guestPassMainTitle}>Guest Pass</Text>
                     <Text style={styles.guestPassSubTitle}>ALL-ACCESS HUNTER PASS</Text>
+
+                    {/* Integrated Awakening Bonus Badge */}
+                    <LinearGradient
+                      colors={['rgba(254, 91, 1, 0.3)', 'rgba(254, 91, 1, 0.08)']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.guestPassRewardBadge}
+                    >
+                      <View style={styles.guestPassRewardIconWrap}>
+                        <Ionicons name="sparkles" size={10} color="#FE5B01" />
+                      </View>
+                      <Text style={styles.guestPassRewardText}>
+                        AWAKENING BONUS <Text style={styles.guestPassRewardXp}>+50 XP</Text>
+                      </Text>
+                    </LinearGradient>
                   </View>
 
                   {/* Bottom Row */}
@@ -248,21 +263,6 @@ export function InviteFriendsModal({
               </View>
             </ViewShot>
           </View>
-
-          {/* RECRUITMENT XP BADGE */}
-          <LinearGradient
-            colors={['rgba(254, 91, 1, 0.16)', 'rgba(254, 91, 1, 0.04)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.recruitmentXpBadge}
-          >
-            <View style={styles.recruitmentXpIconWrap}>
-              <Ionicons name="medal-outline" size={16} color="#FE5B01" />
-            </View>
-            <Text style={styles.recruitmentXpText}>
-              Awakening bonus: <Text style={styles.recruitmentXpTextGold}>+50 XP</Text>
-            </Text>
-          </LinearGradient>
 
           {/* Unique Referral Link Section */}
           <View style={styles.referralSectionContainer}>
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   },
   guestPassCardWrapper: {
     width: '100%',
-    height: 230,
+    height: 245,
     borderRadius: 20,
     overflow: 'hidden',
     position: 'relative',
@@ -463,13 +463,13 @@ const styles = StyleSheet.create({
   },
   guestPassCenterTextGroup: {
     position: 'absolute',
-    bottom: 45,
+    bottom: 44,
     left: 12,
     zIndex: 10,
   },
   guestPassMainTitle: {
     fontFamily: fontFamilies.bold,
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '900',
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.95)',
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
   },
   guestPassSubTitle: {
     fontFamily: fontFamilies.bold,
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '900',
     color: '#FE5B01',
     letterSpacing: 1.2,
@@ -486,6 +486,39 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  guestPassRewardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(254, 91, 1, 0.5)',
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(10, 15, 30, 0.7)',
+  },
+  guestPassRewardIconWrap: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: 'rgba(254, 91, 1, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestPassRewardText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(255, 255, 255, 0.9)',
+    letterSpacing: 0.5,
+  },
+  guestPassRewardXp: {
+    fontFamily: fontFamilies.bold,
+    fontWeight: '900',
+    color: '#FE5B01',
   },
   guestPassFooterRow: {
     position: 'absolute',
@@ -533,43 +566,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#38BDF8',
     letterSpacing: 0.5,
-  },
-  recruitmentXpBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    paddingVertical: 13,
-    paddingHorizontal: 24,
-    gap: 10,
-    alignSelf: 'center',
-    marginTop: 18,
-    width: '100%',
-    shadowColor: '#FE5B01',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  recruitmentXpIconWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(254, 91, 1, 0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recruitmentXpText: {
-    fontFamily: fontFamilies.medium,
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.85)',
-    letterSpacing: 0.3,
-  },
-  recruitmentXpTextGold: {
-    fontFamily: fontFamilies.bold,
-    fontWeight: '800',
-    color: '#FE5B01',
   },
   referralSectionContainer: {
     width: '100%',

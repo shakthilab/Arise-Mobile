@@ -16,6 +16,7 @@ export interface WeeklyProgressCardProps {
   totalDaysCount?: number;
   characterImageSource?: any;
   avatarUrl?: string | null;
+  avatarId?: string | number | null;
 }
 
 const DEFAULT_CHARACTER_IMAGE = CLOUDINARY_ASSETS.high_fidelity;
@@ -27,6 +28,7 @@ export function WeeklyProgressCard({
   totalDaysCount = 7,
   characterImageSource = DEFAULT_CHARACTER_IMAGE,
   avatarUrl,
+  avatarId,
 }: WeeklyProgressCardProps) {
   const activeDays = useMemo(() => {
     if (days && days.length > 0) return days;
@@ -95,7 +97,7 @@ export function WeeklyProgressCard({
                 transform="rotate(-90 25 25)"
               />
             </Svg>
-            <Image source={getAvatarSource(avatarUrl)} style={styles.avatarInsideRing} />
+            <Image source={getAvatarSource(avatarUrl, avatarId)} style={styles.avatarInsideRing} />
           </View>
 
           <View style={styles.progressTextColumn}>

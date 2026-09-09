@@ -5,6 +5,8 @@
 // Cloudinary's upload API using that signature. The Cloudinary API secret
 // never leaves the backend.
 
+import { Platform } from 'react-native';
+
 import { fetchCloudinarySignature, type CloudinaryFolder } from '@/services/api/media.service';
 
 export interface CloudinaryUploadResult {
@@ -12,6 +14,26 @@ export interface CloudinaryUploadResult {
   publicId: string;
   width: number;
   height: number;
+}
+
+/**
+ * Rewrites a Cloudinary delivery URL to request an auto-format,
+ * auto-quality, width-capped variant instead of the original upload.
+ *
+ * Dynamic content (e.g. task images) is stored as the raw `secure_url`
+ * Cloudinary hands back on upload — full-resolution, whatever format the
+ * device captured. Inserting a transformation segment into the URL path
+ * needs no re-upload; Cloudinary generates/caches the derived asset the
+ * first time it's requested. Non-Cloudinary URLs are returned unchanged.
+ */
+export function optimizeCloudinaryUrl(url: string, maxWidth = 800): string {
+  const marker = '/image/upload/';
+  const idx = url.indexOf(marker);
+  if (idx === -1) {
+    return url;
+  }
+  const insertAt = idx + marker.length;
+  return `${url.slice(0, insertAt)}f_auto,q_auto,w_${maxWidth},c_limit/${url.slice(insertAt)}`;
 }
 
 /**
@@ -32,9 +54,17 @@ export async function uploadImageToCloudinary(
   const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
 
   const formData = new FormData();
-  // React Native's FormData accepts this { uri, name, type } shape in place
-  // of a real Blob/File.
-  formData.append('file', { uri: localUri, name: filename, type: mimeType } as any);
+  if (Platform.OS === 'web') {
+    // Web's FormData is spec-compliant: it only accepts a string or a real
+    // Blob/File for the value, silently stringifying anything else to
+    // "[object Object]". Resolve the local/blob URI to an actual Blob first.
+    const fileBlob = await (await fetch(localUri)).blob();
+    formData.append('file', fileBlob, filename);
+  } else {
+    // React Native's native FormData accepts this { uri, name, type } shape
+    // in place of a real Blob/File.
+    formData.append('file', { uri: localUri, name: filename, type: mimeType } as any);
+  }
   formData.append('api_key', apiKey);
   formData.append('timestamp', String(timestamp));
   formData.append('signature', signature);

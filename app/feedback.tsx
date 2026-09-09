@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  BackHandler,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -12,52 +14,55 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as Clipboard from 'expo-clipboard';
 
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { HunterToast, type HunterToastType } from '@/components/common/HunterToast';
 import { Screen } from '@/components/common/Screen';
 import { useAuth } from '@/hooks/useAuth';
+import { showGlobalToast } from '@/store/useToastStore';
 import {
   sendFeedback,
-  type FeedbackCategory,
-  type FeedbackPayload,
+  fetchMyFeedback,
+  type ApiFeedbackCategory,
+  type UserFeedbackItem,
 } from '@/services/api/feedback.service';
 import { uploadImageToCloudinary } from '@/services/media/cloudinary';
 import { fontFamilies } from '@/theme/typography';
 
-const CATEGORIES: { id: FeedbackCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'Bug Report', label: 'Bug Report', icon: 'bug-outline' },
-  { id: 'Suggestion', label: 'Suggestion', icon: 'bulb-outline' },
-  { id: 'Something Else', label: 'Other', icon: 'chatbox-ellipses-outline' },
+const CATEGORIES: { id: ApiFeedbackCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'bug_report', label: 'Bug Report', icon: 'bug-outline' },
+  { id: 'suggestion', label: 'Suggestion', icon: 'bulb-outline' },
+  { id: 'other', label: 'Other', icon: 'chatbox-ellipses-outline' },
 ];
 
-const PLACEHOLDERS: Record<FeedbackCategory, string> = {
-  'Bug Report': 'What went wrong? Steps to reproduce if possible...',
-  Suggestion: 'What new feature or improvement would you love to see?',
-  'Something Else': "Share whatever is on your mind...",
+const PLACEHOLDERS: Record<ApiFeedbackCategory, string> = {
+  bug_report: 'What went wrong? Steps to reproduce if possible...',
+  suggestion: 'What new feature or improvement would you love to see?',
+  other: 'Share whatever is on your mind...',
 };
 
 const MIN_LENGTH = 10;
 const MAX_LENGTH = 1000;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 export default function FeedbackScreen() {
   const { user } = useAuth();
-  const userAny = user as any;
-
   const scrollRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, []);
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'raise' | 'history'>('raise');
+  const [pendingTabSwitch, setPendingTabSwitch] = useState<'raise' | 'history' | null>(null);
 
   // Form States
-  const [selectedCategory, setSelectedCategory] = useState<FeedbackCategory | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<ApiFeedbackCategory | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [screenshotUri, setScreenshotUri] = useState<string | null>(null);
   const [allowContact, setAllowContact] = useState(true);
@@ -65,9 +70,14 @@ export default function FeedbackScreen() {
 
   // UI Flow States
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
-  // Bottom Center Alert Toast State
+  // Feedback History States
+  const [myFeedbackList, setMyFeedbackList] = useState<UserFeedbackItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [copiedTicketId, setCopiedTicketId] = useState<string | number | null>(null);
+
+  // Toast State
   const [toast, setToast] = useState<{
     visible: boolean;
     message: string;
@@ -78,70 +88,152 @@ export default function FeedbackScreen() {
     type: 'error',
   });
 
-  // Animations
-  const successScaleAnim = useRef(new Animated.Value(0.85)).current;
-  const successOpacityAnim = useRef(new Animated.Value(0)).current;
+  // Track unsaved changes
+  const hasUnsavedContent = Boolean(selectedCategory || feedbackText.trim().length > 0 || screenshotUri);
+
+  const resetForm = () => {
+    setSelectedCategory(null);
+    setFeedbackText('');
+    setScreenshotUri(null);
+    setAllowContact(true);
+    setIsInputFocused(false);
+  };
+
+  const navigateBack = () => {
+    try {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/profile');
+      }
+    } catch {
+      router.replace('/(tabs)/profile');
+    }
+  };
+
+  const handleTabSwitch = (targetTab: 'raise' | 'history') => {
+    if (activeTab === targetTab) return;
+
+    if (activeTab === 'raise' && hasUnsavedContent) {
+      setPendingTabSwitch(targetTab);
+      setShowDiscardConfirm(true);
+    } else {
+      setActiveTab(targetTab);
+    }
+  };
+
+  const handleBackPress = () => {
+    if (activeTab === 'raise' && hasUnsavedContent) {
+      setPendingTabSwitch(null);
+      setShowDiscardConfirm(true);
+    } else {
+      navigateBack();
+    }
+  };
 
   useEffect(() => {
-    if (isSuccess) {
-      Animated.parallel([
-        Animated.spring(successScaleAnim, {
-          toValue: 1,
-          friction: 6.5,
-          tension: 50,
-          useNativeDriver: true,
-        }),
-        Animated.timing(successOpacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (activeTab === 'raise' && hasUnsavedContent) {
+        setPendingTabSwitch(null);
+        setShowDiscardConfirm(true);
+        return true;
+      }
+      return false;
+    });
+    return () => backHandler.remove();
+  }, [activeTab, hasUnsavedContent]);
 
-      const timer = setTimeout(() => {
-        router.back();
-      }, 2200);
-
-      return () => clearTimeout(timer);
+  // Load Feedback History
+  const loadFeedbackHistory = useCallback(async () => {
+    setIsLoadingHistory(true);
+    try {
+      const data = await fetchMyFeedback();
+      setMyFeedbackList(data);
+    } catch (err) {
+      console.warn('[FeedbackScreen] Error fetching feedback history:', err);
+    } finally {
+      setIsLoadingHistory(false);
     }
-  }, [isSuccess, successScaleAnim, successOpacityAnim]);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadFeedbackHistory();
+    }, [loadFeedbackHistory])
+  );
 
   const showToast = (message: string, type: HunterToastType = 'error') => {
     setToast({ visible: true, message, type });
   };
 
-  const handleCategorySelect = (category: FeedbackCategory) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+  const handleCategorySelect = (category: ApiFeedbackCategory) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setSelectedCategory(category);
     if (toast.visible) setToast((prev) => ({ ...prev, visible: false }));
   };
 
   const handlePickScreenshot = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        showToast('Gallery access is needed to attach a screenshot.', 'warning');
-        return;
-      }
+    console.log('[FeedbackScreen] handlePickScreenshot triggered');
+    Keyboard.dismiss();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
+    console.log('[FeedbackScreen] Dismissing keyboard & waiting 150ms...');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    try {
+      console.log('[FeedbackScreen] Checking media library permissions...');
+      const permRes = await ImagePicker.getMediaLibraryPermissionsAsync().catch((pErr) => {
+        console.log('[FeedbackScreen] getMediaLibraryPermissionsAsync caught:', pErr);
+        return null;
+      });
+      console.log('[FeedbackScreen] Permission status:', permRes);
+
+      console.log('[FeedbackScreen] Launching ImagePicker.launchImageLibraryAsync...');
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions?.Images ?? ['images'],
-        allowsEditing: true,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
         quality: 0.8,
+        selectionLimit: 1,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setScreenshotUri(result.assets[0].uri);
+      console.log('[FeedbackScreen] ImagePicker result:', JSON.stringify(result));
+
+      if (result && !result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log('[FeedbackScreen] Selected asset:', asset.uri, 'fileSize:', asset.fileSize);
+        if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE_BYTES) {
+          showToast('Image size exceeds 10MB limit. Please select a smaller image.', 'warning');
+          return;
+        }
+        if (asset.uri) {
+          setScreenshotUri(asset.uri);
+          console.log('[FeedbackScreen] Screenshot URI set successfully!');
+        }
+      } else {
+        console.log('[FeedbackScreen] Image picking canceled or no assets selected.');
       }
-    } catch (err) {
-      console.log('Error picking screenshot:', err);
+    } catch (err: any) {
+      console.error('[FeedbackScreen] ERROR during image picking:', err);
+      showToast('Unable to open image library. Please try again.', 'error');
     }
   };
 
   const handleRemoveScreenshot = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setScreenshotUri(null);
+  };
+
+  const handleCopyTicket = async (ticketId: string | number) => {
+    try {
+      await Clipboard.setStringAsync(String(ticketId));
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setCopiedTicketId(ticketId);
+      setTimeout(() => {
+        setCopiedTicketId(null);
+      }, 1500);
+    } catch (err) {
+      console.warn('[FeedbackScreen] Clipboard error:', err);
+    }
   };
 
   const isFormValid =
@@ -158,8 +250,10 @@ export default function FeedbackScreen() {
       return;
     }
 
+    if (isSubmitting) return;
+
     setIsSubmitting(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
     try {
       let uploadedScreenshotUrl: string | null = null;
@@ -172,26 +266,25 @@ export default function FeedbackScreen() {
         }
       }
 
-      const payload: FeedbackPayload = {
+      const payload = {
         category: selectedCategory,
-        feedback_text: feedbackText.trim(),
-        screenshot_url: uploadedScreenshotUrl,
-        allow_contact: allowContact,
-        hunter_id: user?.id ?? userAny?.hunter_id ?? userAny?._id ?? undefined,
-        email: user?.email ?? undefined,
-        app_version: Constants.expoConfig?.version ?? '1.0.0',
-        device_os: Device.osName ?? Platform.OS,
-        device_os_version: Device.osVersion ?? String(Platform.Version),
-        device_model: Device.modelName ?? 'Unknown Device',
-        level: user?.level ?? 12,
-        rank: userAny?.rank ?? 'VANGUARD',
-        timestamp: new Date().toISOString(),
+        message: feedbackText.trim(),
+        attachmentUrl: uploadedScreenshotUrl,
+        allowFollowup: allowContact,
+        appVersion: Constants.expoConfig?.version ?? '1.0.0',
+        deviceOs: Device.osName ?? Platform.OS,
       };
 
-      await sendFeedback(payload);
+      const res = await sendFeedback(payload);
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
-      setIsSuccess(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      const ticketNum = res?.ticketId ?? res?.ticket_id ?? res?.id ?? 'NEW';
+      showGlobalToast(`Report #${ticketNum} received — the System is reviewing it.`, 'success');
+
+      resetForm();
+      setActiveTab('history');
+      loadFeedbackHistory();
     } catch (err: any) {
       console.log('Feedback submission failed:', err);
       const serverMsg =
@@ -207,67 +300,98 @@ export default function FeedbackScreen() {
     ? PLACEHOLDERS[selectedCategory]
     : 'Select a category above to start writing your feedback...';
 
+  const renderStatusBadge = (status: string) => {
+    const s = (status || 'received').toLowerCase();
+    if (s === 'resolved' || s === 'completed') {
+      return (
+        <View style={[styles.statusBadge, styles.statusBadgeGreen]}>
+          <Ionicons name="checkmark-circle" size={12} color="#22C55E" style={{ marginRight: 3 }} />
+          <Text style={[styles.statusBadgeText, styles.statusBadgeTextGreen]}>RESOLVED</Text>
+        </View>
+      );
+    }
+    if (s === 'in_review' || s === 'review' || s === 'in-progress') {
+      return (
+        <View style={[styles.statusBadge, styles.statusBadgeAmber]}>
+          <Text style={[styles.statusBadgeText, styles.statusBadgeTextAmber]}>IN REVIEW</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.statusBadge, styles.statusBadgeGray]}>
+        <Text style={[styles.statusBadgeText, styles.statusBadgeTextGray]}>RECEIVED</Text>
+      </View>
+    );
+  };
+
+  const getCategoryMeta = (cat: string) => {
+    const c = (cat || '').toLowerCase();
+    if (c.includes('bug')) {
+      return { label: 'Bug Report', icon: 'bug-outline' as const };
+    }
+    if (c.includes('suggest')) {
+      return { label: 'Suggestion', icon: 'bulb-outline' as const };
+    }
+    return { label: 'Other', icon: 'chatbox-ellipses-outline' as const };
+  };
+
   return (
     <Screen style={styles.screen}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* CLEAN PROFESSIONAL HEADER */}
+        {/* HEADER */}
         <View style={styles.headerBar}>
           <TouchableOpacity
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={handleBackPress}
             activeOpacity={0.7}
           >
-            <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Send Feedback</Text>
           <View style={styles.headerRightSpacer} />
         </View>
 
-        {isSuccess ? (
-          /* SUCCESS CONFIRMATION STATE */
-          <View style={styles.successContainer}>
-            <Animated.View
-              style={[
-                styles.successCard,
-                {
-                  opacity: successOpacityAnim,
-                  transform: [{ scale: successScaleAnim }],
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={['rgba(254, 91, 1, 0.14)', 'rgba(254, 91, 1, 0.02)']}
-                style={styles.successCardGradient}
-              >
-                <View style={styles.successIconCircle}>
-                  <Ionicons name="checkmark" size={38} color="#FE5B01" />
-                </View>
-
-                <Text style={styles.successHeadline}>Feedback Received</Text>
-                <Text style={styles.successSubtext}>
-                  Thank you for helping us make HunterX better. Our development team reviews all
-                  feedback carefully.
-                </Text>
-
-                <View style={styles.successMetaBox}>
-                  <Text style={styles.successMetaLabel}>CATEGORY</Text>
-                  <Text style={styles.successMetaValue}>{selectedCategory?.toUpperCase()}</Text>
-                </View>
-              </LinearGradient>
-            </Animated.View>
-          </View>
-        ) : (
-          <ScrollView
-            ref={scrollRef}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+        {/* TOP SEGMENTED TAB SWITCHER */}
+        <View style={styles.tabBarContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'raise' && styles.tabButtonActive]}
+            onPress={() => handleTabSwitch('raise')}
+            activeOpacity={0.8}
           >
-            {/* TOP FORM CONTENT GROUP */}
-            <View style={styles.topFormGroup}>
+            <Text style={[styles.tabText, activeTab === 'raise' && styles.tabTextActive]}>
+              Raise
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'history' && styles.tabButtonActive]}
+            onPress={() => handleTabSwitch('history')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.tabBadgeRow}>
+              <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+                Your Requests
+              </Text>
+              {myFeedbackList.length > 0 && (
+                <View style={styles.tabCountBadge}>
+                  <Text style={styles.tabCountText}>{myFeedbackList.length}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {activeTab === 'raise' ? (
+            /* TAB 1: RAISE FEEDBACK FORM */
+            <View style={styles.tabContentGroup}>
               {/* HERO HEADER */}
               <View style={styles.heroSection}>
                 <Text style={styles.heroTitle}>How can we calibrate?</Text>
@@ -338,17 +462,24 @@ export default function FeedbackScreen() {
                 <View
                   style={[
                     styles.inputCard,
+                    !selectedCategory && styles.inputCardDisabled,
                     isInputFocused && styles.inputCardFocused,
                   ]}
                 >
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, !selectedCategory && styles.textInputDisabled]}
                     placeholder={currentPlaceholder}
                     placeholderTextColor="#71717A"
                     value={feedbackText}
                     onChangeText={setFeedbackText}
-                    onFocus={() => setIsInputFocused(true)}
+                    onFocus={() => {
+                      setIsInputFocused(true);
+                      setTimeout(() => {
+                        scrollRef.current?.scrollTo({ y: 180, animated: true });
+                      }, 150);
+                    }}
                     onBlur={() => setIsInputFocused(false)}
+                    editable={!!selectedCategory}
                     multiline
                     maxLength={MAX_LENGTH}
                     textAlignVertical="top"
@@ -385,7 +516,7 @@ export default function FeedbackScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  /* Modern Upload Button */
+                  /* Upload Button */
                   <TouchableOpacity
                     style={styles.uploadCard}
                     onPress={handlePickScreenshot}
@@ -407,7 +538,7 @@ export default function FeedbackScreen() {
               <TouchableOpacity
                 style={styles.contactCard}
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                   setAllowContact(!allowContact);
                 }}
                 activeOpacity={0.8}
@@ -422,15 +553,12 @@ export default function FeedbackScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
-            </View>
 
-            {/* BOTTOM ACTIONS */}
-            <View style={styles.bottomActionGroup}>
-              {/* PURE WHITE SUBMIT BUTTON */}
+              {/* FIELD 5: SUBMIT BUTTON */}
               <TouchableOpacity
                 style={[styles.submitButton, !isFormValid && styles.submitButtonDisabled]}
                 onPress={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isFormValid}
                 activeOpacity={0.85}
               >
                 <LinearGradient
@@ -466,10 +594,114 @@ export default function FeedbackScreen() {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        )}
+          ) : (
+            /* TAB 2: YOUR REQUESTS HISTORY */
+            <View style={styles.historyTabContainer}>
+              <View style={styles.historyHeaderSection}>
+                <Text style={styles.heroTitle}>Your Requests</Text>
+                <Text style={styles.heroSubtitle}>
+                  Track the status of your submitted tickets and system reports.
+                </Text>
+              </View>
 
-        {/* BOTTOM CENTER FLOATING ALERT POPUP (UNIFIED APP TOAST) */}
+              {isLoadingHistory ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#FE5B01" />
+                  <Text style={styles.loadingText}>Fetching your reports...</Text>
+                </View>
+              ) : myFeedbackList.length > 0 ? (
+                <View style={styles.historyListGroup}>
+                  {myFeedbackList.map((item, index) => {
+                    const meta = getCategoryMeta(item.category);
+                    const msgText = item.message || item.feedback_text || (item as any).content || 'No message provided';
+                    const ticketNum = item.ticketId ?? item.ticket_id ?? (item as any).ticket_number ?? item.id ?? (index + 1);
+                    const itemKey = item.id ?? item.ticketId ?? item.ticket_id ?? `feedback_${index}`;
+                    const isCopied = copiedTicketId === ticketNum;
+                    const rawDate = item.createdAt || item.created_at || (item as any).timestamp || (item as any).date;
+                    const dateStr = rawDate
+                      ? new Date(rawDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : 'Recently';
+
+                    return (
+                      <View key={itemKey} style={styles.historyCard}>
+                        <View style={styles.historyHeaderRow}>
+                          <View style={styles.ticketBadgeRow}>
+                            <Text style={styles.ticketNumberText}>#{ticketNum}</Text>
+                            <TouchableOpacity
+                              style={styles.copyBtn}
+                              onPress={() => handleCopyTicket(ticketNum)}
+                              activeOpacity={0.7}
+                            >
+                              {isCopied ? (
+                                <View style={styles.copiedInlineBadge}>
+                                  <Ionicons name="checkmark-done" size={12} color="#22C55E" />
+                                  <Text style={styles.copiedInlineText}>Copied!</Text>
+                                </View>
+                              ) : (
+                                <Ionicons name="copy-outline" size={14} color="#71717A" />
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                          {renderStatusBadge(item.status)}
+                        </View>
+
+                        <View style={styles.historyCategoryBadge}>
+                          <Ionicons name={meta.icon} size={14} color="#FE5B01" style={{ marginRight: 5 }} />
+                          <Text style={styles.historyCategoryText}>{meta.label}</Text>
+                        </View>
+
+                        <Text style={styles.historyMessageText} numberOfLines={2}>
+                          {msgText}
+                        </Text>
+                        <Text style={styles.historyDateText}>{dateStr}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptyHistoryCard}>
+                  <Ionicons name="documents-outline" size={28} color="#52525B" />
+                  <Text style={styles.emptyHistoryTitle}>No reports submitted yet</Text>
+                  <Text style={styles.emptyHistoryText}>
+                    Switch to the Raise tab to submit a bug report or suggestion.
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </ScrollView>
+
+
+
+        {/* DISCARD CONFIRMATION DIALOG */}
+        <ConfirmDialog
+          visible={showDiscardConfirm}
+          title="Discard this report?"
+          message="Your feedback hasn't been sent yet. If you leave now, it'll be lost."
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          destructive={true}
+          onConfirm={() => {
+            setShowDiscardConfirm(false);
+            resetForm();
+            if (pendingTabSwitch) {
+              setActiveTab(pendingTabSwitch);
+              setPendingTabSwitch(null);
+            } else {
+              navigateBack();
+            }
+          }}
+          onCancel={() => {
+            setShowDiscardConfirm(false);
+            setPendingTabSwitch(null);
+          }}
+        />
+
+        {/* TOAST POPUP */}
         <HunterToast
           visible={toast.visible}
           message={toast.message}
@@ -499,10 +731,6 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#141418',
-    borderWidth: 1,
-    borderColor: '#24242A',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -516,24 +744,71 @@ const styles = StyleSheet.create({
   headerRightSpacer: {
     width: 38,
   },
+  tabBarContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#111115',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#222228',
+    padding: 4,
+    marginHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: '#1E1E24',
+    borderWidth: 1,
+    borderColor: '#FE5B01',
+  },
+  tabText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#71717A',
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+  tabBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabCountBadge: {
+    backgroundColor: 'rgba(254, 91, 1, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  tabCountText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 10,
+    color: '#FE5B01',
+  },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
   },
-  topFormGroup: {
-    gap: 26,
+  tabContentGroup: {
+    gap: 24,
   },
   heroSection: {
     gap: 6,
-    paddingVertical: 4,
+    paddingVertical: 2,
     marginBottom: 2,
   },
   heroTitle: {
     fontFamily: fontFamilies.bold,
-    fontSize: 23,
+    fontSize: 22,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.2,
@@ -617,6 +892,10 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 145,
   },
+  inputCardDisabled: {
+    opacity: 0.6,
+    backgroundColor: '#0E0E12',
+  },
   inputCardFocused: {
     borderColor: '#FE5B01',
   },
@@ -626,6 +905,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     lineHeight: 20,
     minHeight: 115,
+  },
+  textInputDisabled: {
+    color: '#71717A',
   },
   helperText: {
     fontFamily: fontFamilies.regular,
@@ -745,13 +1027,18 @@ const styles = StyleSheet.create({
     color: '#71717A',
     lineHeight: 16,
   },
-  bottomActionGroup: {
-    paddingTop: 20,
-    gap: 10,
+  fixedBottomContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    backgroundColor: '#0A0A0C',
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1E',
   },
   submitButton: {
     width: '100%',
-    borderRadius: 16,
+    height: 52,
+    borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 4 },
@@ -764,11 +1051,10 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   submitGradient: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
   },
   submitText: {
     fontFamily: fontFamilies.bold,
@@ -781,81 +1067,143 @@ const styles = StyleSheet.create({
     color: '#71717A',
   },
 
-  /* SUCCESS CONFIRMATION */
-  successContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+  /* TAB 2: HISTORY STYLES */
+  historyTabContainer: {
+    gap: 18,
   },
-  successCard: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FE5B01',
-    backgroundColor: '#131317',
-    overflow: 'hidden',
-    shadowColor: '#FE5B01',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
+  historyHeaderSection: {
+    gap: 6,
+    paddingVertical: 2,
   },
-  successCardGradient: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 22,
-    gap: 14,
-  },
-  successIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(254, 91, 1, 0.12)',
-    borderWidth: 1.5,
-    borderColor: '#FE5B01',
+  loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    paddingVertical: 40,
+    gap: 10,
   },
-  successHeadline: {
-    fontFamily: fontFamilies.bold,
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-    textAlign: 'center',
-  },
-  successSubtext: {
+  loadingText: {
     fontFamily: fontFamilies.regular,
     fontSize: 13,
     color: '#A1A1AA',
-    lineHeight: 19,
-    textAlign: 'center',
-    paddingHorizontal: 8,
   },
-  successMetaBox: {
+  historyListGroup: {
+    gap: 12,
+  },
+  historyCard: {
+    backgroundColor: '#131317',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#22222A',
+    padding: 16,
+    gap: 10,
+  },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ticketBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#1C1C22',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 6,
   },
-  successMetaLabel: {
+  ticketNumberText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 9.5,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  copyBtn: {
+    padding: 4,
+  },
+  copiedInlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 3,
+  },
+  copiedInlineText: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 10,
+    color: '#22C55E',
+  },
+  historyCategoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyCategoryText: {
+    fontFamily: fontFamilies.semiBold,
+    fontSize: 12.5,
+    color: '#E4E4E7',
+  },
+  historyMessageText: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 13,
+    color: '#A1A1AA',
+    lineHeight: 18,
+  },
+  historyDateText: {
+    fontFamily: fontFamilies.medium,
+    fontSize: 11,
+    color: '#52525B',
+  },
+  emptyHistoryCard: {
+    backgroundColor: '#111115',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1F1F26',
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  emptyHistoryTitle: {
+    fontFamily: fontFamilies.bold,
+    fontSize: 15,
+    color: '#E4E4E7',
+  },
+  emptyHistoryText: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 12.5,
     color: '#71717A',
-    fontWeight: '700',
-    letterSpacing: 0.8,
+    textAlign: 'center',
   },
-  successMetaValue: {
+
+  /* STATUS BADGES */
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusBadgeGray: {
+    backgroundColor: '#27272A',
+  },
+  statusBadgeAmber: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+  },
+  statusBadgeGreen: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+  },
+  statusBadgeText: {
     fontFamily: fontFamilies.bold,
-    fontSize: 10.5,
-    color: '#FE5B01',
+    fontSize: 10,
     fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  statusBadgeTextGray: {
+    color: '#A1A1AA',
+  },
+  statusBadgeTextAmber: {
+    color: '#F59E0B',
+  },
+  statusBadgeTextGreen: {
+    color: '#22C55E',
   },
 });

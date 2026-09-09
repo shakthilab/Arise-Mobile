@@ -300,7 +300,7 @@ function formatDateBadge(item: UserActivityLog): { month: string; day: string } 
             onPress={onClose}
             activeOpacity={0.7}
           >
-            <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Activities</Text>
           <View style={styles.headerRightSpacer} />
@@ -356,10 +356,6 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#141418',
-    borderWidth: 1,
-    borderColor: '#24242A',
     alignItems: 'center',
     justifyContent: 'center',
   },

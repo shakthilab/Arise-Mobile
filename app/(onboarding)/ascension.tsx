@@ -19,7 +19,7 @@ import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { useAuth } from '@/hooks/useAuth';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
-import { playIntroAudio } from '@/services/audio/introSound';
+import { playIntroAudio, preloadIntroAudio } from '@/services/audio/introSound';
 import * as Haptics from 'expo-haptics';
 
 export default function AscensionScreen() {
@@ -29,6 +29,7 @@ export default function AscensionScreen() {
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    preloadIntroAudio();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
