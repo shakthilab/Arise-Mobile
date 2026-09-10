@@ -59,6 +59,17 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="metrics"
+        options={{
+          title: 'Metrics',
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.iconContainer, focused && styles.activeIconContainer]}>
+              <Ionicons name="stats-chart" size={20} color={focused ? '#FE5B01' : '#71717A'} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="leaderboard"
         options={{
           title: 'Battles',

@@ -294,6 +294,9 @@ export default function ProfileScreen() {
       case 'activity':
         setIsRecentActivityModalVisible(true);
         break;
+      case 'metrics':
+        router.push('/(tabs)/metrics');
+        break;
       case 'achievements':
         router.push('/(tabs)/achievements');
         break;
@@ -533,6 +536,11 @@ export default function ProfileScreen() {
             icon="create-outline"
             label="Edit Profile"
             onPress={() => handleMenuPress('edit_profile')}
+          />
+          <MenuItem
+            icon="stats-chart-outline"
+            label="Health & Metrics"
+            onPress={() => handleMenuPress('metrics')}
           />
           <MenuItem
             icon="time-outline"
