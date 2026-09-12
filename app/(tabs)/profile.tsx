@@ -134,7 +134,7 @@ export default function ProfileScreen() {
           setUnitSystem(settings.units);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       isMounted = false;
     };
@@ -246,7 +246,7 @@ export default function ProfileScreen() {
           if (freshUser) {
             setUser(freshUser);
           }
-        } catch {}
+        } catch { }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       } catch (err: any) {
         console.warn('[Profile] Failed to update avatar on backend:', err);
