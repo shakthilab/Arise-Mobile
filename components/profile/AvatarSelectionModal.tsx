@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -9,35 +8,46 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { fontFamilies } from '@/theme/typography';
 import { getAvatars, getCachedAvatars, type AvatarItem } from '@/services/api/avatar.service';
+import { AVATAR_THUMB_WIDTH, DEFAULT_BLURHASH, optimizeCloudinaryUrl } from '@/services/media/cloudinary';
 
 export const DEFAULT_FALLBACK_AVATAR = 'https://res.cloudinary.com/sc8zzixt/image/upload/f_auto,q_auto/v1788468328/hunterx/app-assets/arise_avatar_11.jpg';
 
+// Avatars render small almost everywhere (a 40-90px circle), so the default
+// requests a width-capped, auto-format/quality derivative instead of the
+// full-resolution original. A caller rendering the same source large (e.g.
+// profile.tsx's full-height background portrait) should pass an explicit
+// wider `width` — otherwise that 160px derivative gets stretched across a
+// much bigger area and comes out blurry.
+const toAvatarSource = (uri: string, width: number) => ({ uri: optimizeCloudinaryUrl(uri, width) });
+
 export const getAvatarSource = (
   avatarUrl: string | null | undefined,
-  avatarId?: string | number | null
+  avatarId?: string | number | null,
+  width: number = AVATAR_THUMB_WIDTH
 ) => {
   const list = getCachedAvatars();
   const firstAvatarUrl = list && list.length > 0 ? list[0].image_url : DEFAULT_FALLBACK_AVATAR;
 
   if (!avatarUrl && !avatarId) {
-    return { uri: firstAvatarUrl };
+    return toAvatarSource(firstAvatarUrl, width);
   }
 
   if (avatarUrl && typeof avatarUrl === 'string' && (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://'))) {
-    return { uri: avatarUrl };
+    return toAvatarSource(avatarUrl, width);
   }
 
   const searchKey = String(avatarId || avatarUrl);
   if (list && list.length > 0) {
     const matched = list.find((a) => String(a.id) === searchKey || a.image_url === searchKey);
     if (matched && matched.image_url) {
-      return { uri: matched.image_url };
+      return toAvatarSource(matched.image_url, width);
     }
   }
 
-  return { uri: firstAvatarUrl };
+  return toAvatarSource(firstAvatarUrl, width);
 };
 
 export interface AvatarSelectionModalProps {
@@ -151,9 +161,12 @@ export function AvatarSelectionModal({
                     >
                       <View style={styles.circularAvatarFrame}>
                         <Image
-                          source={{ uri: item.image_url }}
+                          source={toAvatarSource(item.image_url, AVATAR_THUMB_WIDTH)}
                           style={styles.circularAvatarImage}
-                          resizeMode="cover"
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                          placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                          transition={150}
                         />
                       </View>
                     </TouchableOpacity>
@@ -268,7 +281,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 34,
-    resizeMode: 'cover',
   },
   cancelActionBtn: {
     backgroundColor: '#FE5B01',

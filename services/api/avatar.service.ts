@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Image as ExpoImage } from 'expo-image';
 import type { ApiResponse } from '@/types/api';
 import { apiClient } from './client';
+import { AVATAR_THUMB_WIDTH, optimizeCloudinaryUrl } from '@/services/media/cloudinary';
 
 export interface AvatarItem {
   id: string;
@@ -25,6 +27,19 @@ function notifyAvatarsReady() {
   listeners.forEach((listener) => listener());
 }
 
+// Warms expo-image's memory+disk cache for the whole avatar catalog as soon
+// as it's fetched, so the picker grid (and any avatar picked from it) is
+// already cached by the time a user opens it instead of loading blank.
+// Non-blocking: a failed prefetch just falls back to the normal on-demand
+// load, same as preloadAssets.ts does for the static app graphics.
+function prefetchAvatarImages(list: AvatarItem[]) {
+  Promise.allSettled(
+    list
+      .filter((a) => a.image_url)
+      .map((a) => ExpoImage.prefetch(optimizeCloudinaryUrl(a.image_url, AVATAR_THUMB_WIDTH), 'memory-disk'))
+  ).catch(() => {});
+}
+
 export async function getAvatars(): Promise<AvatarItem[]> {
   if (cachedAvatars && cachedAvatars.length > 0) {
     return cachedAvatars;
@@ -46,6 +61,7 @@ export async function getAvatars(): Promise<AvatarItem[]> {
           is_default: !!a.is_default,
           unlock_at_level: a.unlock_at_level ?? 0,
         }));
+        prefetchAvatarImages(cachedAvatars);
         return cachedAvatars;
       }
     } catch (err: any) {
@@ -63,6 +79,7 @@ export async function getAvatars(): Promise<AvatarItem[]> {
               is_default: !!a.is_default,
               unlock_at_level: a.unlock_at_level ?? 0,
             }));
+            prefetchAvatarImages(cachedAvatars);
             return cachedAvatars;
           }
         } catch {

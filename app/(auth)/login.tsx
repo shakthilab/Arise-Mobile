@@ -20,6 +20,7 @@ import { Button } from '@/components/common/Button';
 import { DustParticles } from '@/components/common/DustParticles';
 import { GoogleIcon } from '@/components/common/GoogleIcon';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/useAuthStore';
 import { isGoogleSignInCancelled, signInWithGoogle } from '@/services/auth/googleAuth';
 import { colors } from '@/theme/colors';
 import { fontFamilies } from '@/theme/typography';
@@ -88,7 +89,12 @@ export default function LoginScreen() {
     setError(null);
     try {
       await login(email, password);
-      router.replace('/(tabs)');
+      const isOnboarded = useAuthStore.getState().isOnboarded;
+      if (isOnboarded) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(onboarding)/name');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     }

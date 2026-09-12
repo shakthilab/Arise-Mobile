@@ -1,8 +1,11 @@
+import { Image as ExpoImage } from 'expo-image';
+
 import type { ApiResponse } from '@/types/api';
 import type { User } from '@/types/user';
 
 import { apiClient } from './client';
 import { tokenStorage } from './tokenStorage';
+import { AVATAR_THUMB_WIDTH, optimizeCloudinaryUrl } from '@/services/media/cloudinary';
 
 type LoginResponse = {
   user: User;
@@ -11,6 +14,17 @@ type LoginResponse = {
   access_token?: string;
   refresh_token?: string;
 };
+
+// Fired every time we learn who the current user is (login, restoreSession,
+// updateProfile, avatar change, ...) so their avatar is already sitting in
+// expo-image's disk cache by the time the header/profile screen mounts it —
+// instead of that being the one avatar in the app that's always cold.
+function prefetchCurrentUserAvatar(avatarUrl: string | null | undefined) {
+  if (!avatarUrl || !(avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://'))) {
+    return;
+  }
+  ExpoImage.prefetch(optimizeCloudinaryUrl(avatarUrl, AVATAR_THUMB_WIDTH), 'memory-disk').catch(() => {});
+}
 
 export function mapBackendUserToUser(u: any): User {
   if (!u) return u;
@@ -25,12 +39,16 @@ export function mapBackendUserToUser(u: any): User {
   const weightInKg = u.weight_kg ?? u.weight;
   const dob = u.date_of_birth || u.dob || u.birthday;
   const proteinGoal = u.daily_protein_goal ?? u.protein_goal;
+  const isOnboarded = u.onboarding_done ?? u.onboardingDone ?? u.is_onboarded ?? u.onboarded ?? false;
+  const avatarUrl = u.avatarUrl || (u.avatar_id ? `char_${u.avatar_id}` : null);
+
+  prefetchCurrentUserAvatar(avatarUrl);
 
   return {
     ...u,
     id: u.id ? u.id.toString() : '',
     displayName: u.name || u.displayName || 'Hunter',
-    avatarUrl: u.avatarUrl || (u.avatar_id ? `char_${u.avatar_id}` : null),
+    avatarUrl,
     level: u.level ?? progression.current_level ?? 1,
     xp: u.xp ?? progression.total_xp ?? 0,
     currentStreak: dailyStreak,
@@ -48,6 +66,7 @@ export function mapBackendUserToUser(u: any): User {
     birthday: dob,
     daily_protein_goal: proteinGoal,
     protein_goal: proteinGoal,
+    onboarding_done: !!isOnboarded,
   };
 }
 

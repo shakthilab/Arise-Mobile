@@ -1,11 +1,14 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { fontFamilies } from '@/theme/typography';
 import { getAvatarSource } from '@/app/(tabs)/profile';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import { DEFAULT_BLURHASH } from '@/services/media/cloudinary';
 import type { WeekStatus } from '@/types/user';
 import { WeeklyProgressCard } from './WeeklyProgressCard';
 import { StreakBadgesCarousel } from './StreakBadgesCarousel';
@@ -264,17 +267,20 @@ export function WeeklyTracker({
   const totalDays = activeDays.length;
   const completedRatio = totalDays > 1 ? activeIndex / (totalDays - 1) : 0;
 
-  // Animated moving path progress line
-  const pathAnim = useRef(new Animated.Value(0)).current;
+  // Animated moving path progress line — driven by Reanimated so the
+  // animation runs on the UI thread instead of ticking via the JS bridge
+  // every frame (this is a `width` animation, which RN's classic `Animated`
+  // can only run with `useNativeDriver: false`, i.e. on the JS thread).
+  const pathProgress = useSharedValue(0);
 
   useEffect(() => {
-    pathAnim.setValue(0);
-    Animated.timing(pathAnim, {
-      toValue: completedRatio,
-      duration: 1000,
-      useNativeDriver: false,
-    }).start();
-  }, [completedRatio]);
+    pathProgress.value = 0;
+    pathProgress.value = withTiming(completedRatio, { duration: 1000 });
+  }, [completedRatio, pathProgress]);
+
+  const timelineActiveStyle = useAnimatedStyle(() => ({
+    width: `${pathProgress.value * 100}%`,
+  }));
 
   // Node horizontal margins for 7 items
   const nodeMarginPercent = (1 / (2 * (totalDays || 7))) * 100; // ~7.14%
@@ -302,15 +308,7 @@ export function WeeklyTracker({
 
           {/* Animated Active Glowing Orange Moving Path */}
           <Animated.View
-            style={[
-              styles.timelineActiveLine,
-              {
-                width: pathAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0%', '100%'],
-                }),
-              },
-            ]}
+            style={[styles.timelineActiveLine, timelineActiveStyle]}
           >
             <LinearGradient
               colors={['#FE5B01', '#FF8800', '#FE5B01']}
@@ -481,7 +479,14 @@ export function WeeklyTracker({
                   transform="rotate(-90 25 25)"
                 />
               </Svg>
-              <Image source={getAvatarSource(avatarUrl)} style={styles.avatarInsideRing} />
+              <ExpoImage
+                source={getAvatarSource(avatarUrl)}
+                style={styles.avatarInsideRing}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                transition={150}
+              />
             </View>
 
             <View style={styles.progressTextColumn}>

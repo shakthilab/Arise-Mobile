@@ -4,7 +4,7 @@
     "slug": "shakthi",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/app_logo.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "hunterx",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0A0E17",
@@ -25,11 +25,10 @@
     "android": {
       "package": "com.hunterx.mobile",
       "versionCode": 1,
+      "minSdkVersion": 26,
       "adaptiveIcon": {
         "backgroundColor": "#0A0E17",
-        "foregroundImage": "./assets/images/app_logo.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       }
     },
     "web": {
@@ -62,7 +61,9 @@
           "iosUrlScheme": "com.googleusercontent.apps.991893509642-1mpn4fs7gm814s1v0cvjsd4cqfk5klh6"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-health",
+      "react-native-health-connect"
     ],
     "experiments": {
       "typedRoutes": true

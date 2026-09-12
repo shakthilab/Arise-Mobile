@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 
 import { fontFamilies } from '@/theme/typography';
 import { getAvatarSource } from '@/components/profile/AvatarSelectionModal';
 import { CLOUDINARY_ASSETS } from '@/constants/cloudinaryAssets';
+import { DEFAULT_BLURHASH } from '@/services/media/cloudinary';
 import type { WeekStatus } from '@/types/user';
 import { DayTrackerItem, generateWeekDaysFromWeekStatus } from './WeeklyTracker';
 
@@ -97,7 +99,14 @@ export function WeeklyProgressCard({
                 transform="rotate(-90 25 25)"
               />
             </Svg>
-            <Image source={getAvatarSource(avatarUrl, avatarId)} style={styles.avatarInsideRing} />
+            <ExpoImage
+              source={getAvatarSource(avatarUrl, avatarId)}
+              style={styles.avatarInsideRing}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              placeholder={{ blurhash: DEFAULT_BLURHASH }}
+              transition={150}
+            />
           </View>
 
           <View style={styles.progressTextColumn}>

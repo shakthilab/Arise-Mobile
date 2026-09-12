@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Alert,
-  Animated,
-  Easing,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -13,6 +10,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useScrollToTop } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -25,6 +31,7 @@ import { Screen } from '@/components/common/Screen';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/useAuthStore';
 import { fontFamilies } from '@/theme/typography';
+import { DEFAULT_BLURHASH } from '@/services/media/cloudinary';
 
 // Modular Profile Components
 import { AvatarSelectionModal, getAvatarSource } from '@/components/profile/AvatarSelectionModal';
@@ -345,41 +352,47 @@ export default function ProfileScreen() {
     : 0;
 
   const currentAvatarSource = getAvatarSource(user?.avatarUrl, userAny?.avatar_id);
+  // The card's background portrait renders large (55% of card width, full
+  // height) — the default avatar source is sized for a ~70px circle, so
+  // reusing it here upscaled a 160px-wide image across a much bigger area
+  // and came out blurry. Request a wider derivative for this one spot.
+  const watermarkAvatarSource = getAvatarSource(user?.avatarUrl, userAny?.avatar_id, 700);
   const referralCode = userAny?.referral_code ?? '45JLFI17';
 
-  // Animated XP loader values
-  const xpAnim = useRef(new Animated.Value(0)).current;
+  // Animated XP loader — Reanimated shared value driving the bar's `width`
+  // entirely on the UI thread (RN's classic `Animated` can only animate
+  // `width` with `useNativeDriver: false`, i.e. by ticking on the JS thread).
+  const xpProgress = useSharedValue(0);
   const [displayPct, setDisplayPct] = useState(0);
 
   // Load from initial current level progress on focus / mount
   useFocusEffect(
     useCallback(() => {
-      xpAnim.setValue(0);
+      xpProgress.value = 0;
       setDisplayPct(0);
-      const anim = Animated.timing(xpAnim, {
-        toValue: progressPct,
+      xpProgress.value = withTiming(progressPct, {
         duration: 1200,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
       });
-
-      const listenerId = xpAnim.addListener(({ value }) => {
-        setDisplayPct(Math.round(value));
-      });
-
-      anim.start();
-
-      return () => {
-        xpAnim.removeListener(listenerId);
-      };
-    }, [progressPct, xpAnim])
+    }, [progressPct, xpProgress])
   );
 
-  const xpWidthInterpolate = xpAnim.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['0%', '100%'],
-    extrapolate: 'clamp',
-  });
+  // Mirrors the animated value into React state for the on-screen "N%"
+  // label — but only when the rounded percentage actually changes, instead
+  // of on every animation frame like the old Animated.Value listener did.
+  useAnimatedReaction(
+    () => Math.round(xpProgress.value),
+    (rounded, previous) => {
+      if (rounded !== previous) {
+        runOnJS(setDisplayPct)(rounded);
+      }
+    },
+    [xpProgress]
+  );
+
+  const xpBarStyle = useAnimatedStyle(() => ({
+    width: `${Math.min(100, Math.max(0, xpProgress.value))}%`,
+  }));
 
   return (
     <Screen style={styles.screen}>
@@ -426,9 +439,12 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           {/* Character Artwork Background */}
           <Image
-            source={currentAvatarSource}
+            source={watermarkAvatarSource}
             style={styles.watermarkBg}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            placeholder={{ blurhash: DEFAULT_BLURHASH }}
+            transition={150}
           />
 
           <View style={styles.cardHeader}>
@@ -446,7 +462,10 @@ export default function ProfileScreen() {
                   <Image
                     source={currentAvatarSource}
                     style={styles.avatarImage}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                    transition={150}
                   />
                 </View>
               </LinearGradient>
@@ -499,10 +518,7 @@ export default function ProfileScreen() {
             {/* Progress Bar Track */}
             <View style={styles.progressBarTrack}>
               <Animated.View
-                style={[
-                  styles.progressBarFill,
-                  { width: xpWidthInterpolate },
-                ]}
+                style={[styles.progressBarFill, xpBarStyle]}
               >
                 <LinearGradient
                   colors={['#EA580C', '#FE5B01', '#FBBF24']}
@@ -899,7 +915,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 35,
-    resizeMode: 'cover',
   },
   levelBadgeContainer: {
     position: 'absolute',

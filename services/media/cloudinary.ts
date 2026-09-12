@@ -20,11 +20,18 @@ export interface CloudinaryUploadResult {
  * Rewrites a Cloudinary delivery URL to request an auto-format,
  * auto-quality, width-capped variant instead of the original upload.
  *
- * Dynamic content (e.g. task images) is stored as the raw `secure_url`
- * Cloudinary hands back on upload — full-resolution, whatever format the
- * device captured. Inserting a transformation segment into the URL path
- * needs no re-upload; Cloudinary generates/caches the derived asset the
- * first time it's requested. Non-Cloudinary URLs are returned unchanged.
+ * Dynamic content (e.g. task images, avatars) is stored as the raw
+ * `secure_url` Cloudinary hands back on upload — full-resolution, whatever
+ * format the device captured. Inserting a transformation segment into the
+ * URL path needs no re-upload; Cloudinary generates/caches the derived
+ * asset the first time it's requested. Non-Cloudinary URLs are returned
+ * unchanged.
+ *
+ * Some URLs (e.g. the static app assets in constants/cloudinaryAssets.ts)
+ * already carry a `f_auto,q_auto` transform baked in. Rather than stacking
+ * a second transformation segment on top of it — which Cloudinary would
+ * happily do, generating a wasted extra derived image — this detects an
+ * existing transform segment and replaces it with the requested one.
  */
 export function optimizeCloudinaryUrl(url: string, maxWidth = 800): string {
   const marker = '/image/upload/';
@@ -33,8 +40,36 @@ export function optimizeCloudinaryUrl(url: string, maxWidth = 800): string {
     return url;
   }
   const insertAt = idx + marker.length;
-  return `${url.slice(0, insertAt)}f_auto,q_auto,w_${maxWidth},c_limit/${url.slice(insertAt)}`;
+  const rest = url.slice(insertAt);
+  const transformSegment = `f_auto,q_auto,w_${maxWidth},c_limit`;
+
+  // A Cloudinary path looks like .../upload/<transform>/<version>/<public_id>
+  // or .../upload/<version>/<public_id> when nothing was applied yet. A
+  // version segment is `v` followed only by digits; a transform segment is
+  // one or more comma-separated `key_value` pairs — anything else that
+  // isn't a version segment.
+  const slashIdx = rest.indexOf('/');
+  const firstSegment = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+  const isVersionSegment = /^v\d+$/.test(firstSegment);
+  const isTransformSegment = !isVersionSegment && /^[a-z]{1,3}_[^/]+$/i.test(firstSegment);
+
+  if (isTransformSegment) {
+    const remainder = slashIdx === -1 ? '' : rest.slice(slashIdx);
+    return `${url.slice(0, insertAt)}${transformSegment}${remainder}`;
+  }
+
+  return `${url.slice(0, insertAt)}${transformSegment}/${rest}`;
 }
+
+/** Small neutral-gray blurhash used as a universal image placeholder so a
+ * remote image never renders as a blank gap while it loads — expo-image
+ * shows this instantly, then cross-fades to the real image once it's
+ * fetched/decoded (or found in cache). */
+export const DEFAULT_BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
+
+/** Target width for avatar thumbnails — small on screen everywhere they
+ * appear, so there's no reason to ever pull the full-resolution original. */
+export const AVATAR_THUMB_WIDTH = 160;
 
 /**
  * Uploads a local image (e.g. an expo-image-picker asset URI, or a

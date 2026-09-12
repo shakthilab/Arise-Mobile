@@ -26,11 +26,16 @@ const TOTAL_STEPS = 8;
 const CURRENT_STEP = 0; // first step (0-indexed)
 
 export default function OnboardingNameScreen() {
-    const { completeOnboarding } = useAuth();
+    const { logout } = useAuth();
     const storeHunterName = useOnboardingStore((s) => s.hunterName);
     const setHunterNameStore = useOnboardingStore((s) => s.setHunterName);
     const [hunterName, setHunterName] = useState(storeHunterName);
     const [isFocused, setIsFocused] = useState(false);
+
+    const handleBack = async () => {
+        await logout();
+        router.replace('/(auth)/login');
+    };
 
     // Animations
     const headerAnim = useRef(new Animated.Value(0)).current;
@@ -90,7 +95,7 @@ export default function OnboardingNameScreen() {
             >
                 {/* ─── Top Bar: Back + Step Indicator ─── */}
                 <View style={styles.topBar}>
-                    <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
+                    <Pressable onPress={handleBack} hitSlop={12} style={styles.backButton}>
                         <Feather name="arrow-left" size={22} color="#FFFFFF" />
                     </Pressable>
                     <View style={styles.indicatorWrapper}>

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -20,6 +20,7 @@ import { Screen } from '@/components/common/Screen';
 import { fontFamilies } from '@/theme/typography';
 import { AvatarSelectionModal, getAvatarSource } from './AvatarSelectionModal';
 import { useAvatarsReady } from '@/services/api/avatar.service';
+import { DEFAULT_BLURHASH } from '@/services/media/cloudinary';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -335,7 +336,10 @@ export function EditProfileModal({
                   <Image
                     source={currentAvatarSource}
                     style={styles.editAvatarImage}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                    transition={150}
                   />
                 </View>
               </LinearGradient>
@@ -977,7 +981,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 50,
-    resizeMode: 'cover',
   },
   editPencilBadge: {
     position: 'absolute',

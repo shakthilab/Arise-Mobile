@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isAuthenticating: true });
     try {
       const user = await authService.login(email, password);
-      set({ user });
+      set({ user, isOnboarded: !!user.onboarding_done });
     } finally {
       set({ isAuthenticating: false });
     }

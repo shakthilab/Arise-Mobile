@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Animated,
   Easing,
-  Image,
   ImageBackground,
   Pressable,
   ScrollView,
@@ -23,7 +22,7 @@ import { fetchTasksToday, completeTask, reopenTask } from '@/services/api/tasks.
 import type { TaskItem } from '@/types/task';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getCurrentUser } from '@/services/api/auth.service';
-import { optimizeCloudinaryUrl } from '@/services/media/cloudinary';
+import { optimizeCloudinaryUrl, DEFAULT_BLURHASH } from '@/services/media/cloudinary';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Screen } from '@/components/common/Screen';
@@ -636,7 +635,14 @@ export default function MissionsHomeScreen() {
         <View style={styles.topHeader}>
           <View style={styles.userProfileGroup}>
             <View style={styles.avatarWrapper}>
-              <Image source={getAvatarSource(user?.avatarUrl, (user as any)?.avatar_id)} style={styles.avatarImage} />
+              <ExpoImage
+                source={getAvatarSource(user?.avatarUrl, (user as any)?.avatar_id)}
+                style={styles.avatarImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                transition={150}
+              />
               <View style={styles.levelBadgeCircle}>
                 <Text style={styles.levelBadgeText}>{displayLevel}</Text>
               </View>

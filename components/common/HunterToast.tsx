@@ -12,6 +12,7 @@ export interface HunterToastProps {
   message: string;
   type?: HunterToastType;
   duration?: number;
+  showIcon?: boolean;
   onHide?: () => void;
 }
 
@@ -20,6 +21,7 @@ export function HunterToast({
   message,
   type = 'error',
   duration = 2600,
+  showIcon = true,
   onHide,
 }: HunterToastProps) {
   const anim = useRef(new Animated.Value(0)).current;
@@ -105,7 +107,9 @@ export function HunterToast({
       pointerEvents="none"
     >
       <View style={styles.toastContent}>
-        <Ionicons name={iconName} size={18} color={iconColor} style={{ marginRight: 8 }} />
+        {showIcon ? (
+          <Ionicons name={iconName} size={18} color={iconColor} style={{ marginRight: 8 }} />
+        ) : null}
         <Text style={styles.toastText} numberOfLines={2}>
           {message}
         </Text>
@@ -127,23 +131,26 @@ const styles = StyleSheet.create({
   toastContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#1E1E24',
     borderWidth: 1,
     borderColor: '#33333E',
     borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 10,
-    maxWidth: '92%',
+    maxWidth: '90%',
   },
   toastText: {
     fontFamily: fontFamilies.medium,
     fontSize: 13,
     color: '#FFFFFF',
     fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'center',
   },
 });

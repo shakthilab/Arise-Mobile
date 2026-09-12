@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { fontFamilies } from '@/theme/typography';
+import { AVATAR_THUMB_WIDTH, DEFAULT_BLURHASH, optimizeCloudinaryUrl } from '@/services/media/cloudinary';
 
 export interface LeaderboardHunterItem {
   id: string;
@@ -66,7 +68,14 @@ export const HunterRankRow: React.FC<HunterRankRowProps> = ({
 
       {/* Avatar & Level Badge */}
       <View style={styles.avatarCol}>
-        <Image source={{ uri: hunter.avatarUrl }} style={styles.avatarImage} />
+        <Image
+          source={{ uri: optimizeCloudinaryUrl(hunter.avatarUrl, AVATAR_THUMB_WIDTH) }}
+          style={styles.avatarImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          placeholder={{ blurhash: DEFAULT_BLURHASH }}
+          transition={150}
+        />
         <View style={styles.levelBadgeMini}>
           <Text style={styles.levelBadgeMiniText}>{hunter.level}</Text>
         </View>

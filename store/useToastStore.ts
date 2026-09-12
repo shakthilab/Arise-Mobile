@@ -6,7 +6,8 @@ interface ToastState {
   message: string;
   type: HunterToastType;
   duration?: number;
-  showToast: (message: string, type?: HunterToastType, duration?: number) => void;
+  showIcon?: boolean;
+  showToast: (message: string, type?: HunterToastType, duration?: number, showIcon?: boolean) => void;
   hideToast: () => void;
 }
 
@@ -15,15 +16,17 @@ export const useToastStore = create<ToastState>((set) => ({
   message: '',
   type: 'info',
   duration: 3000,
-  showToast: (message, type = 'info', duration = 3000) =>
-    set({ visible: true, message, type, duration }),
+  showIcon: true,
+  showToast: (message, type = 'info', duration = 3000, showIcon = true) =>
+    set({ visible: true, message, type, duration, showIcon }),
   hideToast: () => set((state) => ({ ...state, visible: false })),
 }));
 
 export const showGlobalToast = (
   message: string,
   type: HunterToastType = 'info',
-  duration: number = 3000
+  duration: number = 3000,
+  showIcon: boolean = true
 ) => {
-  useToastStore.getState().showToast(message, type, duration);
+  useToastStore.getState().showToast(message, type, duration, showIcon);
 };

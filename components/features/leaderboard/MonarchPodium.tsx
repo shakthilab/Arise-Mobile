@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,6 +11,7 @@ import Animated, {
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { fontFamilies } from '@/theme/typography';
+import { AVATAR_THUMB_WIDTH, DEFAULT_BLURHASH, optimizeCloudinaryUrl } from '@/services/media/cloudinary';
 
 export interface PodiumHunter {
   id: string;
@@ -73,7 +75,14 @@ export const MonarchPodium: React.FC<MonarchPodiumProps> = ({
             {/* Avatar & Crown */}
             <View style={styles.avatarWrapper}>
               <View style={[styles.avatarFrameBorder, styles.borderSilver]}>
-                <Image source={{ uri: rank2.avatarUrl }} style={styles.avatarImage} />
+                <Image
+                  source={{ uri: optimizeCloudinaryUrl(rank2.avatarUrl, AVATAR_THUMB_WIDTH) }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                  transition={150}
+                />
               </View>
               <View style={[styles.rankBadgeCapsule, styles.bgSilver]}>
                 <Text style={styles.rankBadgeText}>#2</Text>
@@ -115,7 +124,14 @@ export const MonarchPodium: React.FC<MonarchPodiumProps> = ({
             {/* Avatar & Crown */}
             <View style={styles.avatarWrapper1}>
               <View style={[styles.avatarFrameBorder, styles.borderGold]}>
-                <Image source={{ uri: rank1.avatarUrl }} style={styles.avatarImage1} />
+                <Image
+                  source={{ uri: optimizeCloudinaryUrl(rank1.avatarUrl, AVATAR_THUMB_WIDTH) }}
+                  style={styles.avatarImage1}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                  transition={150}
+                />
               </View>
               <View style={[styles.rankBadgeCapsule, styles.bgGold]}>
                 <Text style={styles.rankBadgeText1}>#1</Text>
@@ -156,7 +172,14 @@ export const MonarchPodium: React.FC<MonarchPodiumProps> = ({
             {/* Avatar & Crown */}
             <View style={styles.avatarWrapper}>
               <View style={[styles.avatarFrameBorder, styles.borderBronze]}>
-                <Image source={{ uri: rank3.avatarUrl }} style={styles.avatarImage} />
+                <Image
+                  source={{ uri: optimizeCloudinaryUrl(rank3.avatarUrl, AVATAR_THUMB_WIDTH) }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  placeholder={{ blurhash: DEFAULT_BLURHASH }}
+                  transition={150}
+                />
               </View>
               <View style={[styles.rankBadgeCapsule, styles.bgBronze]}>
                 <Text style={styles.rankBadgeText}>#3</Text>
